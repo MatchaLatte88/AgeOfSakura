@@ -1,0 +1,469 @@
+{
+  "schemaVersion": 1,
+  "economy": {
+    "startingCoins": 500,
+    "startingWood": 0,
+    "startingDiamonds": 20,
+    "secondsPerDiamond": 60,
+    "minSkipCost": 1
+  },
+  "camera": {
+    "yawDegrees": 45,
+    "pitchDegrees": 30,
+    "minOrthoSize": 3.2,
+    "maxOrthoSize": 10,
+    "defaultOrthoSize": 6.2,
+    "zoomSmoothTime": 0.08,
+    "pinchSensitivity": 1,
+    "scrollZoomStep": 0.12,
+    "inertiaDamping": 7,
+    "maxInertiaSpeed": 30,
+    "boundsPadding": 1.5,
+    "defaultFocusX": 10,
+    "defaultFocusZ": 9.5
+  },
+  "input": {
+    "dragThresholdDp": 10,
+    "longPressSeconds": 0.45,
+    "placementGrabRadiusCells": 1.5
+  },
+  "productions": [
+    {
+      "id": "wood_small",
+      "displayName": "Small Load",
+      "durationSeconds": 30,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Wood",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "wood_medium",
+      "displayName": "Normal Load",
+      "durationSeconds": 120,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Wood",
+          "amount": 15
+        }
+      ]
+    },
+    {
+      "id": "wood_large",
+      "displayName": "Large Load",
+      "durationSeconds": 300,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Wood",
+          "amount": 30
+        }
+      ]
+    },
+    {
+      "id": "coins_house_basic",
+      "displayName": "Collect Taxes",
+      "durationSeconds": 60,
+      "inputs": [
+        {
+          "currency": "Rice",
+          "amount": 2
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Coins",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "id": "rice_small",
+      "displayName": "Small Harvest",
+      "durationSeconds": 45,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Rice",
+          "amount": 6
+        }
+      ]
+    },
+    {
+      "id": "rice_medium",
+      "displayName": "Normal Harvest",
+      "durationSeconds": 150,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Rice",
+          "amount": 20
+        }
+      ]
+    },
+    {
+      "id": "rice_large",
+      "displayName": "Large Harvest",
+      "durationSeconds": 330,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Rice",
+          "amount": 45
+        }
+      ]
+    },
+    {
+      "id": "coins_house_l2",
+      "displayName": "Collect Taxes",
+      "durationSeconds": 60,
+      "inputs": [
+        {
+          "currency": "Rice",
+          "amount": 3
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Coins",
+          "amount": 60
+        }
+      ]
+    },
+    {
+      "id": "coins_house_l3",
+      "displayName": "Collect Taxes",
+      "durationSeconds": 60,
+      "inputs": [
+        {
+          "currency": "Rice",
+          "amount": 4
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Coins",
+          "amount": 120
+        }
+      ]
+    }
+  ],
+  "buildings": [
+    {
+      "id": "town_hall",
+      "displayName": "Town Hall",
+      "description": "The heart of your settlement.",
+      "category": "civic",
+      "visualId": "town_hall",
+      "iconId": "town_hall",
+      "footprint": {
+        "width": 3,
+        "height": 3
+      },
+      "buildCost": [],
+      "productions": [],
+      "movable": false,
+      "rotatable": false,
+      "buildable": false,
+      "visualLevel": 1
+    },
+    {
+      "id": "woodcutter",
+      "displayName": "Woodcutter",
+      "description": "Fells timber for construction.",
+      "category": "production",
+      "visualId": "woodcutter",
+      "iconId": "woodcutter",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Coins",
+          "amount": 100
+        }
+      ],
+      "productions": [
+        "wood_small",
+        "wood_medium",
+        "wood_large"
+      ],
+      "emits": [
+        {
+          "variable": "noise",
+          "value": 3,
+          "radius": 4
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "rice_paddy",
+      "displayName": "Rice Paddy",
+      "description": "Flooded fields that feed your people.",
+      "category": "production",
+      "visualId": "rice_paddy",
+      "iconId": "rice_paddy",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Coins",
+          "amount": 150
+        }
+      ],
+      "productions": [
+        "rice_small",
+        "rice_medium",
+        "rice_large"
+      ],
+      "emits": [
+        {
+          "variable": "beauty",
+          "value": 1,
+          "radius": 3
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "house",
+      "displayName": "House",
+      "description": "A modest home. Its people pay coins.",
+      "category": "production",
+      "visualId": "house",
+      "iconId": "house",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 20
+        }
+      ],
+      "productions": [
+        "coins_house_basic"
+      ],
+      "levels": [
+        {
+          "level": 1,
+          "productions": [
+            "coins_house_basic"
+          ]
+        },
+        {
+          "level": 2,
+          "upgradeCost": [
+            {
+              "currency": "Wood",
+              "amount": 40
+            },
+            {
+              "currency": "Coins",
+              "amount": 100
+            }
+          ],
+          "needs": [
+            {
+              "kind": "served",
+              "min": 2
+            },
+            {
+              "kind": "beauty",
+              "min": 2
+            }
+          ],
+          "productions": [
+            "coins_house_l2"
+          ]
+        },
+        {
+          "level": 3,
+          "upgradeCost": [
+            {
+              "currency": "Wood",
+              "amount": 80
+            },
+            {
+              "currency": "Coins",
+              "amount": 300
+            }
+          ],
+          "needs": [
+            {
+              "kind": "served",
+              "min": 4
+            },
+            {
+              "kind": "beauty",
+              "min": 5
+            },
+            {
+              "kind": "faith",
+              "min": 1
+            },
+            {
+              "kind": "noise",
+              "max": 2
+            }
+          ],
+          "productions": [
+            "coins_house_l3"
+          ]
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "garden",
+      "displayName": "Stone Garden",
+      "description": "A raked garden. Neighbours enjoy the view.",
+      "category": "decoration",
+      "visualId": "garden",
+      "iconId": "garden",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 25
+        },
+        {
+          "currency": "Coins",
+          "amount": 50
+        }
+      ],
+      "productions": [],
+      "emits": [
+        {
+          "variable": "beauty",
+          "value": 3,
+          "radius": 5
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "shrine",
+      "displayName": "Shrine",
+      "description": "A small shrine. Faith lifts the spirit nearby.",
+      "category": "decoration",
+      "visualId": "shrine",
+      "iconId": "shrine",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 40
+        },
+        {
+          "currency": "Coins",
+          "amount": 150
+        }
+      ],
+      "productions": [],
+      "emits": [
+        {
+          "variable": "faith",
+          "value": 1,
+          "radius": 7
+        },
+        {
+          "variable": "beauty",
+          "value": 2,
+          "radius": 5
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    }
+  ],
+  "environment": {
+    "terrain": [
+      {
+        "terrain": "Cherry",
+        "variable": "beauty",
+        "value": 2,
+        "radius": 4
+      },
+      {
+        "terrain": "Bamboo",
+        "variable": "beauty",
+        "value": 0.5,
+        "radius": 3
+      },
+      {
+        "terrain": "Water",
+        "variable": "beauty",
+        "value": 0.25,
+        "radius": 3
+      }
+    ]
+  },
+  "map": {
+    "width": 20,
+    "height": 20,
+    "seed": 7,
+    "unlocked": {
+      "x": 4,
+      "z": 4,
+      "width": 12,
+      "height": 12
+    },
+    "townHall": {
+      "buildingId": "town_hall",
+      "x": 9,
+      "z": 10
+    },
+    "rows": [
+      ".TT.TTTs..T...BTTT~~",
+      "R..RTTTTsTTTB.TTTs~~",
+      "Bs.T....sBBs.RT.g~~T",
+      "Tsg.gTg...RT.TsT~~Ts",
+      "Ts.Ts..gs.....g~~.TT",
+      "Bs..s....g,.g.f~~...",
+      "TTBB..,,..,.,,..~~TT",
+      "TTgB..,...,.f,s.~~..",
+      "BBTT..fs.,,,.g.B~~..",
+      "sTT....g.,,,..f.==,,",
+      "TT.Rf.....,....B~~..",
+      "sT...........s.B~~..",
+      "T.g...,,........~~TT",
+      "TT.TRs.......s..~~TT",
+      "BRT.RC.......g.T~~TR",
+      "TT..TTg.......TT~~.B",
+      "TsTT.T.R...g..gT~~TT",
+      "TTT.g..s.TRTTT.T~~T.",
+      ".TBT.TTTTTsTTT.sR~~T",
+      ".RT.TBRBT..RsTTTT~~s"
+    ]
+  }
+}

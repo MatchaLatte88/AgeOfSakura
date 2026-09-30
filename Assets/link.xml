@@ -1,0 +1,4 @@
+<linker>
+  <!-- GameObject.CreatePrimitive adds Sphere/Capsule/Box colliders by type name; without this, managed code stripping removes them from player builds. -->
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+</linker>

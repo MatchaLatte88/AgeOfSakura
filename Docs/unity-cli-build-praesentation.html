@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17231d">
+  <title>Age of Sakura – Android-Build mit der Unity CLI</title>
+  <style>
+    :root {
+      --ink: #17231d;
+      --ink-soft: #425147;
+      --paper: #f3eddd;
+      --paper-deep: #e6dcc5;
+      --vermillion: #b83b2f;
+      --gold: #b58a3d;
+      --moss: #536b50;
+      --line: rgba(23, 35, 29, .18);
+      --shadow: 0 28px 80px rgba(20, 27, 22, .24);
+      --ease: cubic-bezier(.22, 1, .36, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #101713;
+      color: var(--ink);
+    }
+
+    body {
+      overflow: hidden;
+      font-family: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
+    }
+
+    button, a { font: inherit; }
+    button { color: inherit; }
+
+    .deck {
+      position: relative;
+      min-height: 100vh;
+      isolation: isolate;
+      background:
+        radial-gradient(circle at 8% 16%, rgba(181, 138, 61, .14), transparent 24rem),
+        radial-gradient(circle at 88% 82%, rgba(184, 59, 47, .10), transparent 22rem),
+        #101713;
+    }
+
+    .deck::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      opacity: .22;
+      background-image:
+        linear-gradient(90deg, transparent 49.8%, rgba(255,255,255,.06) 50%, transparent 50.2%),
+        linear-gradient(0deg, transparent 49.8%, rgba(255,255,255,.04) 50%, transparent 50.2%);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(circle, black, transparent 78%);
+    }
+
+    .slide {
+      position: absolute;
+      inset: clamp(12px, 2.3vw, 32px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, .42fr);
+      gap: clamp(1.5rem, 4vw, 5rem);
+      align-items: center;
+      padding: clamp(1.7rem, 5vw, 5.5rem);
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 2px 22px 2px 22px;
+      background:
+        linear-gradient(115deg, rgba(255,255,255,.7), transparent 35%),
+        repeating-linear-gradient(0deg, rgba(66,81,71,.025) 0 1px, transparent 1px 5px),
+        var(--paper);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(46px) scale(.985);
+      transition: opacity .5s var(--ease), transform .65s var(--ease), visibility .5s;
+    }
+
+    .slide::after {
+      content: attr(data-mark);
+      position: absolute;
+      right: clamp(1.2rem, 3vw, 3rem);
+      top: clamp(1.2rem, 3vw, 3rem);
+      color: var(--vermillion);
+      font: 700 clamp(3rem, 7vw, 7rem)/1 "Yu Mincho", "BIZ UDPMincho", Georgia, serif;
+      opacity: .095;
+      writing-mode: vertical-rl;
+      pointer-events: none;
+    }
+
+    .slide.is-active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0) scale(1);
+      z-index: 2;
+    }
+
+    .slide.is-before { transform: translateX(-46px) scale(.985); }
+    .slide--wide { grid-template-columns: 1fr; }
+    .slide--cover { grid-template-columns: minmax(0, 1.15fr) minmax(18rem, .55fr); }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: .85rem;
+      margin: 0 0 1.35rem;
+      color: var(--vermillion);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 2.6rem;
+      height: 2px;
+      background: currentColor;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: "Yu Mincho", "BIZ UDPMincho", "Noto Serif JP", Georgia, serif;
+      font-weight: 600;
+      letter-spacing: -.035em;
+    }
+
+    h1 {
+      max-width: 12ch;
+      font-size: clamp(3.2rem, 8vw, 8.8rem);
+      line-height: .92;
+    }
+
+    h2 {
+      max-width: 15ch;
+      font-size: clamp(2.5rem, 6vw, 6.2rem);
+      line-height: .98;
+    }
+
+    h3 { font-size: clamp(1.35rem, 2vw, 2rem); }
+
+    .lead {
+      max-width: 58ch;
+      margin: 1.65rem 0 0;
+      color: var(--ink-soft);
+      font-size: clamp(1rem, 1.35vw, 1.25rem);
+      line-height: 1.72;
+    }
+
+    .accent { color: var(--vermillion); }
+
+    .stamp {
+      width: min(18rem, 56vw);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      justify-self: center;
+      border: clamp(7px, .75vw, 12px) double var(--vermillion);
+      color: var(--vermillion);
+      transform: rotate(3deg);
+      font: 700 clamp(2.7rem, 5vw, 5.5rem)/.9 "Yu Mincho", Georgia, serif;
+      text-align: center;
+      letter-spacing: .04em;
+      box-shadow: inset 0 0 0 6px var(--paper), inset 0 0 0 8px var(--vermillion);
+    }
+
+    .stamp small {
+      display: block;
+      margin-top: .85rem;
+      font: 800 .72rem/1.4 "Aptos", "Segoe UI", sans-serif;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    .checklist, .steps {
+      margin: 2rem 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      display: grid;
+      grid-template-columns: 2rem 1fr;
+      gap: .85rem;
+      align-items: start;
+      padding: .85rem 0;
+      border-bottom: 1px solid var(--line);
+      line-height: 1.55;
+    }
+
+    .checklist li::before {
+      content: "✓";
+      display: grid;
+      place-items: center;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      background: var(--moss);
+      color: var(--paper);
+      font-weight: 800;
+    }
+
+    .note {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: clamp(1.3rem, 2.6vw, 2.5rem);
+      border-left: 1px solid var(--line);
+      color: var(--ink-soft);
+    }
+
+    .note__number {
+      margin-bottom: auto;
+      color: var(--vermillion);
+      font: 600 clamp(4rem, 9vw, 8rem)/1 "Yu Mincho", Georgia, serif;
+    }
+
+    .note strong { color: var(--ink); }
+
+    .terminal {
+      position: relative;
+      margin-top: 2rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 2px 14px 2px 14px;
+      background: #16211b;
+      box-shadow: 0 18px 45px rgba(23, 35, 29, .2);
+      color: #e9e5d7;
+    }
+
+    .terminal__bar {
+      display: flex;
+      align-items: center;
+      gap: .42rem;
+      min-height: 2.4rem;
+      padding: .55rem .8rem;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      color: #9eaa9f;
+      font-size: .76rem;
+      letter-spacing: .08em;
+    }
+
+    .terminal__bar::before,
+    .terminal__bar::after {
+      content: "";
+      width: .65rem;
+      height: .65rem;
+      border-radius: 50%;
+      background: var(--vermillion);
+      box-shadow: 1rem 0 0 var(--gold), 2rem 0 0 #6c8a63;
+      margin-right: 2rem;
+    }
+
+    .terminal__bar::after { display: none; }
+
+    pre {
+      margin: 0;
+      padding: clamp(1.1rem, 2vw, 1.8rem);
+      overflow: auto;
+      font: 500 clamp(.77rem, 1.05vw, .98rem)/1.72 "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      tab-size: 2;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .prompt { color: #e48b7f; }
+    .path { color: #d7bd83; }
+    .flag { color: #9dc39b; }
+    .comment { color: #829187; }
+
+    .copy {
+      position: absolute;
+      right: .65rem;
+      top: .45rem;
+      padding: .45rem .7rem;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      color: #d9dfda;
+      cursor: pointer;
+    }
+
+    .copy:hover, .copy:focus-visible { background: rgba(255,255,255,.13); }
+
+    .command-map {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      margin-top: 2rem;
+      background: var(--line);
+      border: 1px solid var(--line);
+    }
+
+    .command-map article {
+      min-height: 10rem;
+      padding: 1.4rem;
+      background: rgba(243,237,221,.88);
+    }
+
+    .command-map span {
+      display: block;
+      margin-bottom: .75rem;
+      color: var(--vermillion);
+      font: 700 .72rem/1 "Cascadia Code", monospace;
+      letter-spacing: .14em;
+    }
+
+    .command-map p { color: var(--ink-soft); line-height: 1.55; }
+
+    .result-card {
+      position: relative;
+      padding: clamp(1.5rem, 3vw, 3.2rem);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.34);
+    }
+
+    .result-card::before {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border: 1px solid rgba(184,59,47,.28);
+      pointer-events: none;
+    }
+
+    .result-card code {
+      display: block;
+      margin-top: 1rem;
+      color: var(--vermillion);
+      font-family: "Cascadia Code", Consolas, monospace;
+      word-break: break-all;
+    }
+
+    .controls {
+      position: fixed;
+      left: 50%;
+      bottom: clamp(1.1rem, 2.7vw, 2.2rem);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      transform: translateX(-50%);
+      padding: .55rem;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      background: rgba(9,14,11,.78);
+      backdrop-filter: blur(12px);
+      color: #f6f0e1;
+    }
+
+    .controls button {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .controls button:hover,
+    .controls button:focus-visible { background: rgba(255,255,255,.12); }
+
+    .counter {
+      min-width: 4.1rem;
+      text-align: center;
+      font: 700 .76rem/1 "Cascadia Code", monospace;
+      letter-spacing: .08em;
+    }
+
+    .progress {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      z-index: 11;
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,.08);
+    }
+
+    .progress span {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: var(--vermillion);
+      transition: width .5s var(--ease);
+    }
+
+    .hint {
+      position: fixed;
+      right: clamp(1.1rem, 2.6vw, 2rem);
+      bottom: clamp(1.4rem, 3vw, 2.4rem);
+      z-index: 9;
+      color: rgba(255,255,255,.54);
+      font-size: .72rem;
+      letter-spacing: .08em;
+    }
+
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+    @media (max-width: 820px) {
+      .slide, .slide--cover {
+        grid-template-columns: 1fr;
+        align-content: start;
+        padding-bottom: 6rem;
+      }
+      .stamp { width: 12rem; }
+      .note { border-left: 0; border-top: 1px solid var(--line); }
+      .note__number { margin-bottom: 1rem; }
+      .command-map { grid-template-columns: 1fr; }
+      .hint { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+
+    @media print {
+      body { overflow: visible; background: white; }
+      .deck { background: white; }
+      .slide {
+        position: relative;
+        inset: auto;
+        min-height: 100vh;
+        margin: 0;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        page-break-after: always;
+        box-shadow: none;
+      }
+      .controls, .progress, .hint, .copy { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-live="polite">
+    <section class="slide slide--cover is-active" data-title="Start" data-mark="桜">
+      <div>
+        <p class="eyebrow">Age of Sakura · Build Guide</p>
+        <h1>Vom Projekt zur <span class="accent">APK.</span></h1>
+        <p class="lead">Eine kurze, reproduzierbare Route: Projekt prüfen, Unity CLI verwenden, Android-Build erzeugen und das Ergebnis aufs Handy bringen.</p>
+      </div>
+      <div class="stamp" aria-label="Unity CLI, Android">
+        CLI<br>→ APK
+        <small>Windows · Unity 6</small>
+      </div>
+    </section>
+
+    <section class="slide" data-title="Voraussetzungen" data-mark="一">
+      <div>
+        <p class="eyebrow">Schritt 01</p>
+        <h2>Einmal sauber <span class="accent">vorbereiten.</span></h2>
+        <ul class="checklist">
+          <li><span><strong>Unity Hub</strong> ist installiert und du bist angemeldet.</span></li>
+          <li><span><strong>Unity 6000.0.84f1</strong> ist installiert – das Projekt nennt diese Version in <code>ProjectSettings/ProjectVersion.txt</code>.</span></li>
+          <li><span>Beim Editor sind <strong>Android Build Support</strong>, Android SDK/NDK Tools und OpenJDK installiert.</span></li>
+          <li><span>Öffne PowerShell direkt im Projektordner <strong>AgeOfSakura</strong>.</span></li>
+        </ul>
+      </div>
+      <aside class="note">
+        <div class="note__number">01</div>
+        <p><strong>Wichtig:</strong> Der Build läuft headless. Du musst den Unity Editor dafür nicht manuell öffnen.</p>
+      </aside>
+    </section>
+
+    <section class="slide" data-title="CLI prüfen" data-mark="二">
+      <div>
+        <p class="eyebrow">Schritt 02</p>
+        <h2>Unity CLI <span class="accent">finden.</span></h2>
+        <p class="lead">Aktuelle Unity-Hub-Versionen bringen die CLI mit. Lege den Pfad einmal in einer PowerShell-Variable ab und prüfe die Anmeldung.</p>
+        <div class="terminal">
+          <div class="terminal__bar">PowerShell</div>
+          <button class="copy" type="button" data-copy="cli-check">Kopieren</button>
+          <pre id="cli-check"><span class="prompt">$</span> <span class="path">$unityCli</span> = "C:\Program Files\Unity Hub\resources\cli\unity.exe"
+
+<span class="prompt">$</span> &amp; <span class="path">$unityCli</span> --version
+<span class="prompt">$</span> &amp; <span class="path">$unityCli</span> auth status
+<span class="prompt">$</span> &amp; <span class="path">$unityCli</span> license
+
+<span class="comment"># Optional: Projekt in der passenden Unity-Version öffnen</span>
+<span class="prompt">$</span> &amp; <span class="path">$unityCli</span> open .</pre>
+        </div>
+      </div>
+      <aside class="note">
+        <div class="note__number">02</div>
+        <p>Erwartet: <strong>Signed in as …</strong> und eine aktive <strong>Unity Personal</strong>- oder Pro-Lizenz. Vor dem headless Build den geöffneten Editor wieder schließen.</p>
+      </aside>
+    </section>
+
+    <section class="slide slide--wide" data-title="Build" data-mark="三">
+      <div>
+        <p class="eyebrow">Schritt 03 · Hauptbefehl</p>
+        <h2>Den Android-Build <span class="accent">erzeugen.</span></h2>
+        <div class="terminal">
+          <div class="terminal__bar">PowerShell · im Projektordner</div>
+          <button class="copy" type="button" data-copy="build-command">Kopieren</button>
+          <pre id="build-command"><span class="prompt">$</span> &amp; <span class="path">$unityCli</span> --no-banner build . `
+  <span class="flag">--target Android</span> `
+  <span class="flag">--execute-method</span> AgeOfSakura.EditorTools.BuildScripts.BuildAndroidDevelopment `
+  <span class="flag">--output-path</span> ".\Builds\AgeOfSakura-dev.apk" `
+  <span class="flag">--allow-dirty-build</span> `
+  <span class="flag">--timeout</span> 1800 `
+  <span class="flag">--log-file</span> ".\Logs\android-build-cli.log"</pre>
+        </div>
+        <div class="command-map">
+          <article><span>--target</span><h3>Plattform</h3><p>Schaltet den Editor für diesen Lauf auf Android.</p></article>
+          <article><span>--execute-method</span><h3>Projektlogik</h3><p>Ruft das vorhandene Build-Skript im Projekt auf.</p></article>
+          <article><span>--log-file</span><h3>Diagnose</h3><p>Schreibt ein dauerhaftes Log, falls etwas schiefgeht.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-title="Ergebnis" data-mark="四">
+      <div>
+        <p class="eyebrow">Schritt 04</p>
+        <h2>Das Ergebnis <span class="accent">prüfen.</span></h2>
+        <p class="lead">Ein erfolgreicher Lauf endet mit <strong>Build succeeded</strong>. Die Development-APK liegt im Build-Ordner des Projekts.</p>
+        <div class="result-card">
+          <h3>Deine APK</h3>
+          <code>Builds\AgeOfSakura-dev.apk</code>
+          <p>Build-Log:</p>
+          <code>Logs\android-build-cli.log</code>
+        </div>
+      </div>
+      <aside class="note">
+        <div class="note__number">04</div>
+        <p>Die Ausgabe des Projekt-Skripts enthält außerdem Größe, Ergebnis und Fehleranzahl.</p>
+      </aside>
+    </section>
+
+    <section class="slide" data-title="Handy" data-mark="五">
+      <div>
+        <p class="eyebrow">Schritt 05 · Optional</p>
+        <h2>Als Update aufs <span class="accent">Handy.</span></h2>
+        <p class="lead">Aktiviere USB-Debugging, verbinde das Gerät und bestätige den RSA-Dialog auf dem Handy. Danach bleibt der Spielstand bei einer Update-Installation erhalten.</p>
+        <div class="terminal">
+          <div class="terminal__bar">PowerShell · Android SDK platform-tools</div>
+          <button class="copy" type="button" data-copy="adb-command">Kopieren</button>
+          <pre id="adb-command"><span class="prompt">$</span> <span class="path">$adb</span> = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+
+<span class="prompt">$</span> &amp; <span class="path">$adb</span> devices -l
+<span class="prompt">$</span> &amp; <span class="path">$adb</span> install <span class="flag">-r</span> ".\Builds\AgeOfSakura-dev.apk"</pre>
+        </div>
+      </div>
+      <aside class="note">
+        <div class="note__number">05</div>
+        <p><strong><code>-r</code></strong> ersetzt die installierte App mit gleicher Paket-ID, ohne ihre Daten zu löschen.</p>
+      </aside>
+    </section>
+
+    <section class="slide" data-title="Fehlersuche" data-mark="診">
+      <div>
+        <p class="eyebrow">Wenn etwas klemmt</p>
+        <h2>Drei schnelle <span class="accent">Checks.</span></h2>
+        <ul class="checklist">
+          <li><span><strong>Keine Lizenz:</strong> <code>unity auth status</code> und <code>unity license</code> prüfen; falls nötig zuerst im Hub anmelden.</span></li>
+          <li><span><strong>Android-Modul fehlt:</strong> Im Hub bei der Editor-Version „Add modules“ öffnen und Android Build Support vollständig ergänzen.</span></li>
+          <li><span><strong>Gerät unauthorized/offline:</strong> USB-Debugging-Dialog am Handy bestätigen, Kabel neu verbinden und ADB erneut prüfen.</span></li>
+        </ul>
+      </div>
+      <aside class="note">
+        <div class="note__number">?</div>
+        <p>Die erste Anlaufstelle bleibt immer <strong>Logs\android-build-cli.log</strong> – suche darin von unten nach <code>Error</code> oder <code>Exception</code>.</p>
+      </aside>
+    </section>
+
+    <section class="slide slide--cover" data-title="Fertig" data-mark="完">
+      <div>
+        <p class="eyebrow">Reproduzierbarer Workflow</p>
+        <h1>Ein Befehl.<br><span class="accent">Eine APK.</span></h1>
+        <p class="lead">Die Unity CLI übernimmt Anmeldung, korrekte Editor-Version und Batch-Ausführung. Dein projektspezifisches Build-Skript bleibt die einzige Quelle der Wahrheit.</p>
+      </div>
+      <div class="stamp" aria-label="Build fertig">
+        BUILD<br>OK
+        <small>Age of Sakura</small>
+      </div>
+    </section>
+  </main>
+
+  <nav class="controls" aria-label="Präsentationssteuerung">
+    <button id="prev" type="button" aria-label="Vorherige Folie">←</button>
+    <span class="counter" id="counter">01 / 08</span>
+    <button id="next" type="button" aria-label="Nächste Folie">→</button>
+  </nav>
+  <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+  <div class="hint">← → Leertaste · F Vollbild</div>
+
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    const counter = document.querySelector('#counter');
+    const progress = document.querySelector('#progress');
+    let index = Math.max(0, Math.min(slides.length - 1, Number(location.hash.slice(1)) - 1 || 0));
+
+    function show(nextIndex, updateHash = true) {
+      index = (nextIndex + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => {
+        slide.classList.toggle('is-active', slideIndex === index);
+        slide.classList.toggle('is-before', slideIndex < index);
+        slide.setAttribute('aria-hidden', slideIndex === index ? 'false' : 'true');
+      });
+      counter.textContent = `${String(index + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+      progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+      document.title = `${slides[index].dataset.title} · Age of Sakura CLI Build`;
+      if (updateHash) history.replaceState(null, '', `#${index + 1}`);
+    }
+
+    document.querySelector('#prev').addEventListener('click', () => show(index - 1));
+    document.querySelector('#next').addEventListener('click', () => show(index + 1));
+
+    addEventListener('keydown', (event) => {
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); show(index + 1); }
+      if (['ArrowLeft', 'PageUp'].includes(event.key)) { event.preventDefault(); show(index - 1); }
+      if (event.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
+      if (event.key === 'Home') show(0);
+      if (event.key === 'End') show(slides.length - 1);
+    });
+
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const source = document.getElementById(button.dataset.copy);
+        try {
+          await navigator.clipboard.writeText(source.innerText);
+          const previous = button.textContent;
+          button.textContent = 'Kopiert ✓';
+          setTimeout(() => { button.textContent = previous; }, 1400);
+        } catch {
+          button.textContent = 'Markieren & kopieren';
+        }
+      });
+    });
+
+    show(index, false);
+  </script>
+</body>
+</html>

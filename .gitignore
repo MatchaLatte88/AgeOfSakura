@@ -1,0 +1,36 @@
+# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emory[Cc]aptures/
+/[Rr]ecordings/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.booproj
+*.pdb
+*.mdb
+*.apk
+*.aab
+*.unitypackage
+sysinfo.txt
+crashlytics-build.properties
+
+# Visual Studio / Rider
+.vs/
+.idea/
+
+# dotnet test project (Tools/CoreTests)
+Tools/**/bin/
+Tools/**/obj/
+
+# Android/Unity build temp and stray editor logs
+/.utmp/
+/Logs$NAME.*

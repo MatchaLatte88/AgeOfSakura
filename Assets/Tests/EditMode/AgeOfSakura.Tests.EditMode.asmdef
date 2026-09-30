@@ -1,0 +1,25 @@
+{
+    "name": "AgeOfSakura.Tests.EditMode",
+    "rootNamespace": "AgeOfSakura.Tests",
+    "references": [
+        "AgeOfSakura.Core",
+        "AgeOfSakura.Game",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

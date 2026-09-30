@@ -1,0 +1,21 @@
+{
+    "name": "AgeOfSakura.Editor",
+    "rootNamespace": "AgeOfSakura.EditorTools",
+    "references": [
+        "AgeOfSakura.Core",
+        "AgeOfSakura.Game",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
