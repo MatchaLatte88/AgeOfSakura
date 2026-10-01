@@ -94,10 +94,11 @@ namespace AgeOfSakura.Game
             Directory.CreateDirectory(options.OutputDirectory);
             yield return new WaitForSecondsRealtime(1.0f);
             // screenshots must not catch buildings half-way through their construction animation (the "buildin" walkthrough does on purpose)
-            BuildInAnimation.SpeedMultiplier = options.States == "style" || options.States == "hall" ? 1000f : 1f;
+            BuildInAnimation.SpeedMultiplier = options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" ? 1000f : 1f;
             if (options.States == "game") PrepareGameplayWorld();
             else if (options.States == "style") PrepareStyleWorld();
             else if (options.States == "hall") PrepareHallWorld();
+            else if (options.States == "woodcutter" || options.States == "shrine") PrepareSingleBuildingWorld();
             else if (options.States == "gallery") { }
             else PrepareWorld();
 
@@ -109,6 +110,7 @@ namespace AgeOfSakura.Game
                 if (options.States == "game") yield return RunGameplay();
                 else if (options.States == "style") yield return RunStyle();
                 else if (options.States == "hall") yield return RunHall();
+                else if (options.States == "woodcutter" || options.States == "shrine") yield return RunSingleBuilding();
                 else if (options.States == "gallery") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).Run();
                 else yield return RunStates();
             }
@@ -166,6 +168,32 @@ namespace AgeOfSakura.Game
             yield return new WaitForSecondsRealtime(1.6f);     // the zoom pivot keeps pulling the focus until the size has settled
             ctx.Camera.FrameOn(world);
             yield return new WaitForSecondsRealtime(0.4f);
+        }
+
+        private void PrepareSingleBuildingWorld()
+        {
+            string def = options.States;
+            singleBuildingId = ctx.Session.Buildings.PlaceFree(def, new GridPos(6, 4), 0).InstanceId;
+        }
+
+        private string singleBuildingId;
+
+        /// <summary>Quick review of one building (-uistates woodcutter / shrine): all three looks close up, plus one wide shot of level 3.</summary>
+        private IEnumerator RunSingleBuilding()
+        {
+            ctx.Ui.CloseAllPanels();
+            var building = ctx.Session.Buildings.Get(singleBuildingId);
+            var centre = new Vector3(building.Origin.X + 1f, 0f, building.Origin.Z + 1f);
+            string prefix = options.States[0].ToString();
+            for (int level = 1; level <= 3; level++)
+            {
+                building.Level = level;
+                ctx.Views.Rebuild(building);
+                yield return CloseUp(centre, 1.7f);
+                yield return Shot($"{prefix}{level}_close", 0.6f);
+            }
+            yield return CloseUp(centre, 3.2f);
+            yield return Shot($"{prefix}3_wide", 0.6f);
         }
 
         private void PrepareHallWorld()

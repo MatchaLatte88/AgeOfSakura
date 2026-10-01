@@ -74,6 +74,13 @@ namespace AgeOfSakura.Game
 
         public ActorVisual Villager(int variant)
         {
+            prim.ThinBoxes = true; // lids, lashes, cords and pattern diamonds: flat boxes for everything hair-thin
+            try { return BuildVillager(variant); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private ActorVisual BuildVillager(int variant)
+        {
             variant = ((variant % VillagerVariants) + VillagerVariants) % VillagerVariants;
             bool woman = variant == 1 || variant == 4;
             bool elder = variant == 2;
@@ -105,6 +112,8 @@ namespace AgeOfSakura.Game
             var wood = art.Lit(Palette.TimberLight, PaintedTexture.Planks);
             var gold = art.NoOutline(Palette.Gold);
             var red = art.NoOutline(Palette.BannerRed);
+            var white = art.Lit(Hex("#f2ece0"));
+            var steel = art.Lit(Hex("#8a929c"));
 
             var root = new GameObject("Villager");
             var body = Pivot(root.transform, "Body", Vector3.zero);
@@ -114,9 +123,11 @@ namespace AgeOfSakura.Game
             var chest = Limb(torso, cloth, new[] { new Vector3(0f, -0.02f, 0f), new Vector3(0f, 0.05f, 0f), new Vector3(0f, 0.14f, 0f), new Vector3(0f, 0.215f, 0f) },
                 new[] { 0.062f, 0.055f, 0.061f, 0.064f }, 12, 0.5f);
             chest.transform.localScale = new Vector3(1.14f, 1f, 0.8f);
+            var juban = art.NoOutline(Color.Lerp(clothColor, Hex("#1c2230"), 0.55f));
             foreach (var s in new[] { -1f, 1f })
             {
-                var collar = prim.Box(torso, trim, new Vector3(s * 0.017f, 0.155f, 0.052f), new Vector3(0.011f, 0.1f, 0.007f), new Vector3(-6f, 0f, -s * 19f), false);
+                prim.Box(torso, juban, new Vector3(s * 0.0125f, 0.155f, 0.0505f), new Vector3(0.007f, 0.094f, 0.005f), new Vector3(-6f, 0f, -s * 19f), false);   // inner under-kimono
+                var collar = prim.Box(torso, trim, new Vector3(s * 0.017f, 0.155f, 0.052f), new Vector3(0.008f, 0.1f, 0.006f), new Vector3(-6f, 0f, -s * 19f), false);
                 collar.name = "Collar";
             }
             prim.Box(torso, trim, new Vector3(0f, 0.208f, 0.0f), new Vector3(0.05f, 0.012f, 0.05f), default, false);   // collar band round the neck
@@ -136,6 +147,15 @@ namespace AgeOfSakura.Game
                 prim.Box(torso, obi, new Vector3(0.03f, 0.03f, -0.06f), new Vector3(0.012f, 0.05f, 0.012f), new Vector3(0f, 0f, 12f), false);
             }
 
+            // obi details: a cord (obijime) round the sash; women also get a pleated obi-age scarf and a closed fan tucked in at the right
+            prim.Box(torso, art.NoOutline(woman ? Hex("#c4504a") : Hex("#3a2a20")), new Vector3(0f, 0.07f, 0.0535f), new Vector3(0.072f, 0.011f, 0.007f), default, false);
+            if (woman)
+            {
+                prim.Box(torso, art.Lit(Hex("#f3c9d2")), new Vector3(0f, 0.114f, 0.048f), new Vector3(0.07f, 0.02f, 0.008f), new Vector3(-8f, 0f, 0f), false);
+                prim.Box(torso, art.Lit(Hex("#e8d9a8")), new Vector3(0.062f, 0.085f, 0.048f), new Vector3(0.016f, 0.07f, 0.01f), new Vector3(0f, 0f, -18f), false);
+                prim.Box(torso, gold, new Vector3(0.059f, 0.058f, 0.0525f), new Vector3(0.018f, 0.006f, 0.004f), new Vector3(0f, 0f, -18f), false);
+            }
+
             // ---- lower garment: short kimono over trousers, or a long narrow kimono
             var hips = Pivot(body, "Hips", new Vector3(0f, 0.31f, 0f));
             Transform skirt = null;
@@ -148,6 +168,21 @@ namespace AgeOfSakura.Game
                 s.transform.localScale = new Vector3(1.12f, 1f, 0.86f);
                 var trimBand = prim.Cylinder(skirt, trim, new Vector3(0f, hem + 0.008f, 0f), flare + 0.002f, 0.016f);
                 trimBand.transform.localScale = new Vector3(1.12f, 1f, 0.86f);
+                // woven hem band in the obi colour a hand above the trim; a ring of small diamonds on the women's kimonos
+                float yA = hem * 0.45f;
+                float yBand = hem + 0.042f;
+                float rBand = Mathf.Lerp(0.068f, flare, Mathf.Clamp01((yA - yBand) / (yA - hem))) + 0.002f;
+                prim.Cylinder(skirt, obi, new Vector3(0f, yBand, 0f), rBand, 0.012f, default, false).transform.localScale = new Vector3(1.12f, 1f, 0.86f);
+                if (woman)
+                {
+                    float yD = hem + 0.095f;
+                    float rD = Mathf.Lerp(0.068f, flare, Mathf.Clamp01((yA - yD) / (yA - hem))) + 0.002f;
+                    for (int i = 0; i < 9; i++)
+                    {
+                        float a = i * Mathf.PI * 2f / 9f;
+                        prim.Box(skirt, trim, new Vector3(Mathf.Sin(a) * rD * 1.12f, yD, Mathf.Cos(a) * rD * 0.86f), new Vector3(0.014f, 0.014f, 0.004f), new Vector3(0f, a * Mathf.Rad2Deg, 45f), false);
+                    }
+                }
             }
 
             // ---- head, neck, face, hair, hats
@@ -161,9 +196,26 @@ namespace AgeOfSakura.Game
             foreach (var s in new[] { -1f, 1f })
             {
                 Ball(head, dark, new Vector3(s * 0.02f, 0.056f, 0.04f), new Vector3(0.0105f, 0.013f, 0.008f), false);              // eye
-                prim.Box(head, dark, new Vector3(s * 0.02f, 0.071f, 0.041f), new Vector3(0.022f, 0.005f, 0.006f), new Vector3(0f, 0f, s * -6f), false); // brow
+                prim.Box(head, elder ? hair : dark, new Vector3(s * 0.02f, 0.071f, 0.041f), new Vector3(0.022f, 0.005f, 0.006f), new Vector3(0f, 0f, s * -6f), false); // brow
                 Ball(head, skin, new Vector3(s * 0.041f, 0.048f, 0.0f), new Vector3(0.012f, 0.026f, 0.018f), false);                // ear
             }
+            // finer face: eye shine and lids, blush and lashes for the women, painted lips, a long earlobe for the monk
+            var shine = art.NoOutline(Hex("#fff8ec"));
+            var lid = art.NoOutline(Color.Lerp(skinColor, Hex("#6a4030"), 0.35f));
+            var blush = art.NoOutline(Color.Lerp(skinColor, Hex("#e07a70"), 0.45f));
+            foreach (var s in new[] { -1f, 1f })
+            {
+                Ball(head, shine, new Vector3(s * 0.0185f, 0.0585f, 0.0443f), Vector3.one * 0.0042f, false);
+                prim.Box(head, lid, new Vector3(s * 0.02f, 0.0635f, 0.0405f), new Vector3(0.017f, 0.0035f, 0.005f), new Vector3(0f, 0f, s * -6f), false);
+                if (woman)
+                {
+                    Ball(head, blush, new Vector3(s * 0.032f, 0.032f, 0.04f), new Vector3(0.016f, 0.01f, 0.006f), false);
+                    prim.Box(head, dark, new Vector3(s * 0.029f, 0.0625f, 0.0405f), new Vector3(0.011f, 0.003f, 0.004f), new Vector3(0f, 0f, s * -28f), false);   // lash
+                }
+                if (monk) Ball(head, skin, new Vector3(s * 0.0425f, 0.028f, 0.0f), new Vector3(0.01f, 0.032f, 0.014f), false);                               // long earlobe
+            }
+            if (woman) prim.Box(head, art.NoOutline(Hex("#c4504a")), new Vector3(0f, 0.0145f, 0.0462f), new Vector3(0.014f, 0.004f, 0.004f), default, false);   // lips
+
             if (!monk)
             {
                 // hair: cap over the back and top of the skull
@@ -171,6 +223,14 @@ namespace AgeOfSakura.Game
                 if (woman)
                 {
                     Ball(head, hair, new Vector3(0f, 0.105f, -0.03f), new Vector3(0.056f, 0.05f, 0.05f));                        // bun
+                    Ball(head, hair, new Vector3(0f, 0.09f, 0.03f), new Vector3(0.074f, 0.03f, 0.036f), false);                   // fringe
+                    prim.Box(head, art.Lit(Hex("#8a2f2a")), new Vector3(0f, 0.094f, -0.052f), new Vector3(0.036f, 0.014f, 0.008f), new Vector3(20f, 0f, 0f), false);   // lacquer comb
+                    prim.Box(head, gold, new Vector3(0f, 0.094f, -0.0575f), new Vector3(0.028f, 0.004f, 0.004f), new Vector3(20f, 0f, 0f), false);
+                    if (variant == 4)
+                    {
+                        Ball(head, art.NoOutline(Hex("#f6a8c0")), new Vector3(-0.05f, 0.1f, -0.03f), Vector3.one * 0.022f, false);
+                        Ball(head, gold, new Vector3(-0.05f, 0.1f, -0.019f), Vector3.one * 0.008f, false);
+                    }
                     prim.Cylinder(head, gold, new Vector3(0.02f, 0.108f, -0.036f), 0.004f, 0.075f, new Vector3(0f, 0f, 70f), false);  // kanzashi pin
                     Ball(head, red, new Vector3(0.056f, 0.108f, -0.036f), Vector3.one * 0.018f, false);
                     foreach (var s in new[] { -1f, 1f })
@@ -180,9 +240,15 @@ namespace AgeOfSakura.Game
                 {
                     prim.Cylinder(head, hair, new Vector3(0f, 0.11f, 0.016f), 0.014f, 0.036f, new Vector3(28f, 0f, 0f), false);   // top-knot (chonmage)
                     prim.Cylinder(head, gold, new Vector3(0f, 0.101f, 0.008f), 0.0155f, 0.008f, new Vector3(28f, 0f, 0f), false);
+                    if (!elder)
+                        foreach (var s in new[] { -1f, 1f })
+                            prim.Box(head, hair, new Vector3(s * 0.0425f, 0.058f, -0.004f), new Vector3(0.008f, 0.036f, 0.02f), default, false);   // sideburns
                     if (elder)
                     {
                         Ball(head, hair, new Vector3(0f, 0.006f, 0.048f), new Vector3(0.026f, 0.034f, 0.02f), false);            // wispy beard
+                        Ball(head, hair, new Vector3(0f, -0.012f, 0.044f), new Vector3(0.018f, 0.03f, 0.016f), false);
+                        foreach (var s in new[] { -1f, 1f })
+                            Ball(head, hair, new Vector3(s * 0.014f, 0.024f, 0.047f), new Vector3(0.022f, 0.01f, 0.012f), false);   // moustache
                     }
                 }
             }
@@ -219,13 +285,20 @@ namespace AgeOfSakura.Game
                     var cuff = Limb(elbow, cloth, new[] { new Vector3(0f, -0.03f, 0f), new Vector3(0f, -0.09f, 0f) }, new[] { 0.022f, 0.03f }, 8);
                     cuff.transform.localScale = new Vector3(0.9f, 1f, 1.25f);
                     prim.Cylinder(elbow, trim, new Vector3(0f, -0.09f, 0f), 0.029f, 0.005f, default, false).transform.localScale = new Vector3(0.9f, 1f, 1.25f);
+                    prim.Cylinder(elbow, obi, new Vector3(0f, -0.055f, 0f), 0.0268f, 0.006f, default, false).transform.localScale = new Vector3(0.9f, 1f, 1.25f);   // accent band
                 }
                 Ball(elbow, skin, new Vector3(0f, -0.108f, 0.004f), new Vector3(0.03f, 0.034f, 0.032f));
+                prim.Box(elbow, skin, new Vector3(0f, -0.128f, 0.006f), new Vector3(0.02f, 0.024f, 0.012f), default, false);                                // fingers
+                Ball(elbow, skin, new Vector3(-side * 0.013f, -0.112f, 0.012f), new Vector3(0.011f, 0.022f, 0.012f), false);                                  // thumb
             }
             if (bareForearms)
             {
                 // rolled-up sleeves
-                foreach (var e in new[] { elbowL, elbowR }) prim.Cylinder(e, cloth, new Vector3(0f, 0.008f, 0f), 0.026f, 0.03f);
+                foreach (var e in new[] { elbowL, elbowR })
+                {
+                    prim.Cylinder(e, cloth, new Vector3(0f, 0.008f, 0f), 0.026f, 0.03f);
+                    if (worker) prim.Cylinder(e, white, new Vector3(0f, -0.082f, 0f), 0.0175f, 0.014f, default, false);   // wrist wraps
+                }
             }
 
             // ---- legs: hip, knee, ankle; trousers, tabi socks, straw sandals
@@ -238,10 +311,16 @@ namespace AgeOfSakura.Game
                 Limb(hip, legs, new[] { new Vector3(0f, 0.005f, 0f), new Vector3(0f, -0.135f, 0f) }, new[] { 0.035f, 0.029f }, 8);
                 Limb(knee, legs, new[] { new Vector3(0f, 0f, 0f), new Vector3(0f, -0.14f, 0f) }, new[] { 0.029f, woman ? 0.017f : 0.02f }, 8);
                 Ball(knee, legs, Vector3.zero, new Vector3(0.056f, 0.056f, 0.056f));
+                if (farmer || worker)
+                    foreach (var (wy, wr) in new[] { (-0.06f, 0.0272f), (-0.095f, 0.0249f), (-0.125f, 0.023f) })
+                        prim.Cylinder(knee, art.Lit(Hex("#cfc3a2")), new Vector3(0f, wy, 0f), wr, 0.012f, default, false);                  // gaiter wraps
                 var foot = Pivot(knee, "Foot", new Vector3(0f, -0.14f, 0f));
                 Ball(foot, art.Lit(Hex("#e6dfcf")), new Vector3(0f, -0.01f, 0.02f), new Vector3(0.036f, 0.028f, 0.076f));            // tabi sock
                 prim.Box(foot, sandal, new Vector3(0f, -0.026f, 0.024f), new Vector3(0.044f, 0.012f, 0.095f));                         // waraji sole
                 prim.Box(foot, red, new Vector3(0f, -0.014f, 0.038f), new Vector3(0.05f, 0.006f, 0.012f), default, false);              // strap
+                foreach (var s in new[] { -1f, 1f })
+                    prim.Box(foot, red, new Vector3(s * 0.011f, 0.001f, 0.026f), new Vector3(0.006f, 0.005f, 0.05f), new Vector3(0f, s * -16f, 0f), false);   // hanao thong
+                prim.Box(foot, art.NoOutline(Hex("#9a8f7c")), new Vector3(0f, -0.011f, 0.054f), new Vector3(0.003f, 0.02f, 0.02f), default, false);       // split toe of the tabi
             }
 
             // ---- things they carry
@@ -285,6 +364,45 @@ namespace AgeOfSakura.Game
             {
                 // prayer beads round the neck and a rope sash
                 Limb(torso, art.Lit(Hex("#5a3a22")), new[] { new Vector3(-0.03f, 0.2f, 0.045f), new Vector3(0f, 0.15f, 0.058f), new Vector3(0.03f, 0.2f, 0.045f) }, new[] { 0.007f, 0.007f, 0.007f }, 5);
+            }
+
+            if (farmer)
+            {
+                // towel round the neck and a sickle at the belt
+                prim.Cylinder(torso, white, new Vector3(0f, 0.236f, -0.002f), 0.027f, 0.02f, default, false);
+                prim.Box(torso, white, new Vector3(0.066f, 0.02f, 0.045f), new Vector3(0.026f, 0.075f, 0.008f), new Vector3(0f, 0f, 8f), false);
+                var sickle = Pivot(torso, "Sickle", new Vector3(-0.062f, 0.04f, 0.05f));
+                sickle.localRotation = Quaternion.Euler(0f, 0f, 20f);
+                prim.Box(sickle, wood, new Vector3(0f, -0.03f, 0f), new Vector3(0.012f, 0.06f, 0.012f), default, false);
+                prim.Box(sickle, steel, new Vector3(0.016f, 0.012f, 0f), new Vector3(0.05f, 0.008f, 0.006f), new Vector3(0f, 0f, 14f), false);
+                prim.Box(sickle, steel, new Vector3(0.04f, 0.026f, 0f), new Vector3(0.03f, 0.008f, 0.006f), new Vector3(0f, 0f, 55f), false);
+            }
+            if (worker)
+            {
+                // tasuki cords crossing the chest and a round emblem on the back of the jacket
+                foreach (var s in new[] { -1f, 1f })
+                    prim.Box(torso, white, new Vector3(0f, 0.13f, 0.05f), new Vector3(0.008f, 0.15f, 0.006f), new Vector3(0f, 0f, s * 32f), false);
+                prim.Cylinder(torso, white, new Vector3(0f, 0.12f, -0.05f), 0.022f, 0.004f, new Vector3(90f, 0f, 0f), false);
+                prim.Box(torso, dark, new Vector3(0f, 0.12f, -0.0525f), new Vector3(0.02f, 0.004f, 0.004f), default, false);
+                prim.Box(torso, dark, new Vector3(0f, 0.12f, -0.0525f), new Vector3(0.004f, 0.02f, 0.004f), default, false);
+            }
+            if (elder)
+            {
+                // a gourd flask on a cord at the sash
+                var gourd = art.Lit(Hex("#c9a45a"));
+                Ball(torso, gourd, new Vector3(0.082f, 0.04f, 0.012f), new Vector3(0.034f, 0.034f, 0.034f));
+                Ball(torso, gourd, new Vector3(0.082f, 0.066f, 0.012f), new Vector3(0.024f, 0.026f, 0.024f));
+                prim.Cylinder(torso, wood, new Vector3(0.082f, 0.086f, 0.012f), 0.005f, 0.012f, default, false);
+                prim.Cylinder(torso, art.NoOutline(Hex("#6b5a44")), new Vector3(0.082f, 0.056f, 0.012f), 0.0135f, 0.004f, default, false);
+            }
+            if (monk)
+            {
+                // kesa: a dark red cloth worn diagonally over the robe, and an alms bowl at the hip
+                var kesa = art.Lit(Hex("#8a2f2a"));
+                prim.Box(torso, kesa, new Vector3(0f, 0.125f, 0.05f), new Vector3(0.034f, 0.2f, 0.006f), new Vector3(0f, 0f, -38f), false);
+                prim.Box(torso, kesa, new Vector3(0f, 0.125f, -0.05f), new Vector3(0.034f, 0.2f, 0.006f), new Vector3(0f, 0f, 38f), false);
+                prim.Cylinder(torso, art.Lit(Hex("#2a2320")), new Vector3(-0.088f, 0.02f, 0.035f), 0.03f, 0.022f);
+                prim.Cylinder(torso, art.NoOutline(Palette.Gold), new Vector3(-0.088f, 0.03f, 0.035f), 0.031f, 0.004f, default, false);
             }
 
             MergeBones(root.transform);
@@ -380,6 +498,13 @@ namespace AgeOfSakura.Game
 
         public ActorVisual Dog()
         {
+            prim.ThinBoxes = true;
+            try { return BuildDog(); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private ActorVisual BuildDog()
+        {
             var root = new GameObject("Dog");
             var fur = art.Lit(Hex("#A9743F"));
             var furDark = art.Lit(Hex("#7d5228"));
@@ -409,10 +534,25 @@ namespace AgeOfSakura.Game
                 var ear = Ball(head, dark, new Vector3(s * 0.058f, 0.005f, -0.012f), new Vector3(0.028f, 0.075f, 0.052f));
                 ear.transform.localRotation = Quaternion.Euler(0f, 0f, s * -18f);
             }
+            // finer head: tan brow spots, cheeks and eye shine; a red collar with a tag; chest ruff
+            var tan = art.Lit(Hex("#c28a4c"));
+            var shineDog = art.NoOutline(Hex("#fff8ec"));
+            foreach (var s in new[] { -1f, 1f })
+            {
+                Ball(head, tan, new Vector3(s * 0.03f, 0.04f, 0.044f), new Vector3(0.022f, 0.012f, 0.012f), false);
+                Ball(head, light, new Vector3(s * 0.04f, -0.02f, 0.04f), new Vector3(0.026f, 0.024f, 0.034f), false);
+                Ball(head, shineDog, new Vector3(s * 0.0285f, 0.0235f, 0.0505f), Vector3.one * 0.005f, false);
+            }
+            prim.Cylinder(body, art.NoOutline(Hex("#c7392e")), new Vector3(0f, 0.272f, 0.155f), 0.047f, 0.022f, new Vector3(46f, 0f, 0f), false);
+            Ball(body, art.Lit(Palette.Gold), new Vector3(0f, 0.236f, 0.19f), Vector3.one * 0.018f, false);
+            Ball(body, light, new Vector3(0f, 0.178f, 0.128f), new Vector3(0.075f, 0.09f, 0.06f), false);
+
             var tail = Pivot(body, "Tail", new Vector3(0f, 0.245f, -0.135f));
             Limb(tail, fur, new[] { new Vector3(0f, 0f, 0f), new Vector3(0f, 0.05f, -0.035f), new Vector3(0f, 0.11f, -0.045f), new Vector3(0f, 0.16f, -0.02f) }, new[] { 0.022f, 0.02f, 0.016f, 0.011f }, 6);
             Ball(tail, light, new Vector3(0f, 0.165f, -0.018f), new Vector3(0.026f, 0.036f, 0.026f), false);
+            Ball(tail, fur, new Vector3(0f, 0.1f, -0.043f), new Vector3(0.034f, 0.07f, 0.034f), false);                  // plume
 
+            var toeLine = art.NoOutline(Hex("#3B2A1E"));
             var hipPivots = new Transform[4];
             var kneePivots = new Transform[4];
             var offsets = new[] { new Vector3(-0.052f, 0.205f, 0.1f), new Vector3(0.052f, 0.205f, 0.1f), new Vector3(-0.052f, 0.205f, -0.11f), new Vector3(0.052f, 0.205f, -0.11f) };
@@ -424,6 +564,9 @@ namespace AgeOfSakura.Game
                 kneePivots[i] = Pivot(hipPivots[i], "Knee", new Vector3(0f, -0.085f, front ? 0.004f : -0.01f));
                 Limb(kneePivots[i], fur, new[] { new Vector3(0f, 0f, 0f), new Vector3(0f, -0.09f, front ? 0.0f : 0.012f) }, new[] { 0.021f, 0.016f }, 7);
                 Ball(kneePivots[i], light, new Vector3(0f, -0.098f, 0.014f), new Vector3(0.04f, 0.028f, 0.056f));   // paw with a light sock
+                Ball(hipPivots[i], fur, new Vector3(0f, -0.015f, front ? 0.004f : -0.012f), front ? new Vector3(0.062f, 0.085f, 0.08f) : new Vector3(0.07f, 0.1f, 0.105f)); // shoulder / thigh
+                foreach (var t in new[] { -1f, 1f })
+                    prim.Box(kneePivots[i], toeLine, new Vector3(t * 0.008f, -0.1f, 0.04f), new Vector3(0.0025f, 0.014f, 0.016f), default, false);   // toe lines
             }
 
             MergeBones(root.transform);
@@ -471,6 +614,13 @@ namespace AgeOfSakura.Game
 
         public ActorVisual Chicken(bool brown)
         {
+            prim.ThinBoxes = true;
+            try { return BuildChicken(brown); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private ActorVisual BuildChicken(bool brown)
+        {
             var root = new GameObject("Chicken");
             var feathers = art.Lit(brown ? Hex("#B5773C") : Hex("#F4F1E8"));
             var feathersDark = art.Lit(brown ? Hex("#7c4a22") : Hex("#d9d3c2"));
@@ -489,6 +639,32 @@ namespace AgeOfSakura.Game
                 var wing = Ball(body, feathersDark, new Vector3(s * 0.066f, 0.16f, -0.005f), new Vector3(0.03f, 0.09f, 0.14f));
                 wing.transform.localRotation = Quaternion.Euler(-6f, 0f, s * 8f);
             }
+            // layered breast feathers, a hackle of neck feathers, long wing tips and two sickle feathers in the tail
+            var scale = art.NoOutline(brown ? Hex("#bf8043") : Hex("#f1ece0"));
+            var hackle = art.NoOutline(brown ? Hex("#d89a3c") : Hex("#fffdf4"));
+            for (int row = 0; row < 3; row++)
+            {
+                int n = row == 1 ? 2 : 3;
+                for (int i = 0; i < n; i++)
+                {
+                    float x = (i - (n - 1) * 0.5f) * 0.04f;
+                    float y = 0.115f + row * 0.03f;
+                    float inside = 1f - Mathf.Pow((y - 0.15f) / 0.07f, 2f) - Mathf.Pow(x / 0.0675f, 2f);
+                    float z = 0.015f + 0.095f * Mathf.Sqrt(Mathf.Max(0f, inside)) - 0.004f;
+                    Ball(body, scale, new Vector3(x, y, z), new Vector3(0.05f, 0.034f, 0.026f), false).transform.localRotation = Quaternion.Euler(-22f, 0f, x * 200f);
+                }
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI * 2f / 6f;
+                Ball(body, hackle, new Vector3(Mathf.Sin(a) * 0.032f, 0.2f, 0.066f + Mathf.Cos(a) * 0.026f), new Vector3(0.026f, 0.05f, 0.026f), false);
+            }
+            foreach (var s in new[] { -1f, 1f })
+                Ball(body, tailColor, new Vector3(s * 0.064f, 0.14f, -0.07f), new Vector3(0.016f, 0.04f, 0.085f), false).transform.localRotation = Quaternion.Euler(-4f, s * 5f, 0f);
+            foreach (var s in new[] { -1f, 1f })
+                Limb(body, tailColor, new[] { new Vector3(s * 0.006f, 0.2f, -0.082f), new Vector3(s * 0.01f, 0.245f, -0.108f), new Vector3(s * 0.016f, 0.28f, -0.145f), new Vector3(s * 0.022f, 0.29f, -0.185f),
+                    new Vector3(s * 0.027f, 0.275f, -0.222f), new Vector3(s * 0.031f, 0.245f, -0.245f), new Vector3(s * 0.033f, 0.208f, -0.255f) }, new[] { 0.011f, 0.0115f, 0.0105f, 0.009f, 0.0065f, 0.004f, 0.0015f }, 5);
+
             // tail: a fan of curved feathers
             for (int i = -2; i <= 2; i++)
             {
@@ -499,10 +675,13 @@ namespace AgeOfSakura.Game
             neck.name = "Neck";
             var head = Pivot(body, "Head", new Vector3(0f, 0.28f, 0.095f));
             Ball(head, feathers, new Vector3(0f, 0.008f, 0.006f), new Vector3(0.046f, 0.05f, 0.056f));
-            for (int i = 0; i < 3; i++)
-                Ball(head, red, new Vector3(0f, 0.04f + (i == 1 ? 0.004f : 0f), 0.02f - i * 0.014f), new Vector3(0.01f, 0.024f - i * 0.003f, 0.02f), false);   // comb
+            for (int i = 0; i < 5; i++)
+                Ball(head, red, new Vector3(0f, 0.04f + (i == 1 || i == 2 ? 0.006f : 0f), 0.026f - i * 0.011f), new Vector3(0.01f, 0.026f - Mathf.Abs(i - 1.5f) * 0.004f, 0.016f), false);   // comb
             Ball(head, red, new Vector3(0f, -0.022f, 0.03f), new Vector3(0.014f, 0.026f, 0.012f), false);                                          // wattle
             prim.Cone(head, orange, new Vector3(0f, 0.004f, 0.03f), 0.014f, 0.036f).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // beak
+            prim.Cone(head, art.Lit(Hex("#d28a2a")), new Vector3(0f, -0.003f, 0.03f), 0.01f, 0.026f).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // lower beak
+            foreach (var s in new[] { -1f, 1f })
+                Ball(head, art.NoOutline(brown ? Hex("#f2ece0") : Hex("#d0382d")), new Vector3(s * 0.024f, -0.006f, -0.004f), new Vector3(0.008f, 0.014f, 0.01f), false);   // ear lobe
             foreach (var s in new[] { -1f, 1f })
             {
                 Ball(head, eyeRing, new Vector3(s * 0.021f, 0.014f, 0.016f), new Vector3(0.01f, 0.012f, 0.008f), false);
@@ -511,12 +690,23 @@ namespace AgeOfSakura.Game
 
             var hipL = Pivot(body, "LegL", new Vector3(-0.03f, 0.1f, 0.01f));
             var hipR = Pivot(body, "LegR", new Vector3(0.03f, 0.1f, 0.01f));
-            foreach (var hip in new[] { hipL, hipR })
+            var shins = new Transform[2];
+            var feet = new Transform[2];
+            var legs = new[] { hipL, hipR };
+            for (int l = 0; l < 2; l++)
             {
-                Limb(hip, orange, new[] { new Vector3(0f, 0.01f, 0f), new Vector3(0f, -0.098f, 0f) }, new[] { 0.009f, 0.007f }, 5);
+                // thigh, shin bending at the hock, and a foot pivot that keeps the toes flat on the ground
+                var hip = legs[l];
+                Limb(hip, orange, new[] { new Vector3(0f, 0.01f, 0f), new Vector3(0f, -0.05f, 0f) }, new[] { 0.009f, 0.008f }, 5);
+                Ball(hip, feathersDark, new Vector3(0f, 0.005f, 0f), new Vector3(0.05f, 0.066f, 0.066f), false);                                       // thigh feathers
+                shins[l] = Pivot(hip, "Shin", new Vector3(0f, -0.05f, 0f));
+                Limb(shins[l], orange, new[] { Vector3.zero, new Vector3(0f, -0.048f, 0f) }, new[] { 0.008f, 0.007f }, 5);
+                Ball(shins[l], orange, Vector3.zero, Vector3.one * 0.017f, false);                                                                      // hock
+                feet[l] = Pivot(shins[l], "Foot", new Vector3(0f, -0.048f, 0f));
+                prim.Cone(feet[l], orange, new Vector3(0f, 0f, -0.002f), 0.005f, 0.022f).transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);   // back toe
                 for (int t = -1; t <= 1; t++)
                 {
-                    var toe = prim.Cone(hip, orange, new Vector3(0f, -0.098f, 0.004f), 0.006f, 0.04f);
+                    var toe = prim.Cone(feet[l], orange, new Vector3(0f, 0f, 0.004f), 0.006f, 0.04f);
                     toe.transform.localRotation = Quaternion.Euler(90f, t * 26f, 0f);
                 }
             }
@@ -535,6 +725,13 @@ namespace AgeOfSakura.Game
                         float s = Mathf.Sin(p) * 38f;
                         hipL.localRotation = X(s);
                         hipR.localRotation = X(-s);
+                        // a leg swinging forward folds at the hock and lifts; the foot counter-rotates so the toes stay flat
+                        float liftL = Mathf.Max(0f, -Mathf.Cos(p)) * 45f;
+                        float liftR = Mathf.Max(0f, Mathf.Cos(p)) * 45f;
+                        shins[0].localRotation = X(liftL);
+                        shins[1].localRotation = X(liftR);
+                        feet[0].localRotation = X(-(s + liftL));
+                        feet[1].localRotation = X(-(-s + liftR));
                         head.localPosition = new Vector3(0f, 0.28f, 0.095f + Mathf.Sin(p) * 0.012f);
                         head.localRotation = X(Mathf.Sin(p) * 4f);
                         body.localPosition = new Vector3(0f, Mathf.Abs(Mathf.Sin(p)) * 0.012f, 0f);
@@ -544,6 +741,11 @@ namespace AgeOfSakura.Game
                     {
                         hipL.localRotation = Quaternion.identity;
                         hipR.localRotation = Quaternion.identity;
+                        for (int l = 0; l < 2; l++)
+                        {
+                            shins[l].localRotation = Quaternion.identity;
+                            feet[l].localRotation = Quaternion.identity;
+                        }
                         body.localPosition = Vector3.zero;
                         body.localRotation = Quaternion.identity;
                         head.localPosition = new Vector3(0f, 0.28f, 0.095f);

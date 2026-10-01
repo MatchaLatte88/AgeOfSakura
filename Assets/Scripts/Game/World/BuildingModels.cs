@@ -782,6 +782,13 @@ namespace AgeOfSakura.Game
 
         private GameObject Woodcutter(int level, int w, int d)
         {
+            prim.ThinBoxes = true; // rafter tips, slats and courses: flat boxes for everything hair-thin
+            try { return BuildWoodcutter(level); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private GameObject BuildWoodcutter(int level)
+        {
             var rng = Rng("woodcutter");
             var root = NewRoot("Woodcutter_Model", 1.75f + 0.15f * level, 1.3f + 0.15f * level);
             var ground = Group(root, "Ground");
@@ -845,7 +852,10 @@ namespace AgeOfSakura.Game
                 prim.BoxOnGround(roof, plankDark, new Vector3(sx + Mathf.Sign(sx + 0.3f) * 0.03f, roofY, 0.25f), new Vector3(0.04f, 0.4f, 0.04f));
             }
             prim.Cylinder(roof, roofDark, new Vector3(-0.3f, ridgeY, 0.25f), 0.07f, 1.4f, new Vector3(0f, 0f, 90f));
-            RidgeBands(roof, ridgeY, 1.4f, 0.078f, art.Lit(Hex("#7a5a2a"), PaintedTexture.Thatch));
+            var bands = new GameObject("RidgeBands").transform; // RidgeBands centres on the origin; this roof is centred on (-0.3, 0.25)
+            bands.SetParent(roof, false);
+            bands.localPosition = new Vector3(-0.3f, 0f, 0.25f);
+            RidgeBands(bands, ridgeY, 1.4f, 0.078f, art.Lit(Hex("#7a5a2a"), PaintedTexture.Thatch));
             Chimney(root, roof, new Vector3(-0.6f, roofY + 0.05f, 0.5f), 0.55f);
             PaperLantern(body, new Vector3(0.23f, 0.72f, -0.3f), 0.75f);
 
@@ -907,6 +917,8 @@ namespace AgeOfSakura.Game
             for (int i = 0; i < 3; i++)
                 prim.Cylinder(wheelbarrow, bark, new Vector3(-0.04f + i * 0.06f, 0.29f, 0f), 0.035f, 0.2f, new Vector3(90f, 0f, 0f), false);
 
+            WoodcutterDetails(level, Rng("woodcutter_details"), ground, body, roof, props, roofY, ridgeY); // own sequence: the shrubs below keep their shape
+
             if (Props != null)
             {
                 // shrubs stay in the back corners, away from the log pile and the hut walls
@@ -914,6 +926,104 @@ namespace AgeOfSakura.Game
                 Bush(trees, new Vector3(0.92f, 0f, 0.97f), 0.7f, rng);
             }
             return root;
+        }
+
+        /// <summary>
+        /// Second pass over the woodcutter: stone footing, shutters, gable framing and crossed ridge boards, thatch courses, exposed rafter
+        /// tips, a rain barrel, sawdust and split kindling, plus extra fittings for levels 2 and 3. Everything stays inside the footprint.
+        /// </summary>
+        private void WoodcutterDetails(int level, System.Random rng, Transform ground, Transform body, Transform roof, Transform props, float roofY, float ridgeY)
+        {
+            var wood = WoodMat;
+            var dark = FrameMat;
+            var steel = SteelMat;
+            var iron = art.Lit(Hex("#3a2a20"));
+            var rope = art.Lit(Hex("#b79a6a"));
+
+            // footing: fieldstones under the left wall and along the front edge of the yard, a step in front of the workshop
+            StoneLine(ground, new Vector3(-0.9f, 0.075f, -0.18f), new Vector3(-0.9f, 0.075f, 0.66f), 6, 0.1f, rng, StoneMat);
+            StoneLine(ground, new Vector3(-0.88f, 0.055f, -0.97f), new Vector3(0.88f, 0.055f, -0.97f), 9, 0.075f, rng, StoneDarkMat);
+            prim.Box(body, wood, new Vector3(-0.3f, 0.075f, -0.3f), new Vector3(0.5f, 0.05f, 0.15f));
+
+            // left wall: a girt across the battens, a window sill and open shutters
+            prim.Box(body, dark, new Vector3(-0.895f, 0.32f, 0.25f), new Vector3(0.03f, 0.045f, 0.92f), default, false);
+            prim.Box(body, wood, new Vector3(-0.9f, 0.43f, 0.25f), new Vector3(0.06f, 0.03f, 0.34f), default, false);
+            foreach (var side in new[] { -1f, 1f })
+            {
+                float hinge = 0.25f + side * 0.155f;
+                var dir = new Vector3(-0.906f, 0f, side * 0.423f);
+                var centre = new Vector3(-0.89f, 0.55f, hinge) + dir * 0.06f;
+                prim.Box(body, wood, centre, new Vector3(0.022f, 0.27f, 0.12f), new Vector3(0f, -side * 65f, 0f), false);
+            }
+
+            // gable ends: tie beam, braces and crossed ridge boards (chigi)
+            foreach (var sx in new[] { -0.3f - 0.61f, -0.3f + 0.61f })
+            {
+                float sign = sx < -0.3f ? -1f : 1f;
+                float bx = sx + sign * 0.04f;
+                prim.Box(roof, dark, new Vector3(bx, roofY + 0.1f, 0.25f), new Vector3(0.035f, 0.04f, 0.8f), default, false);
+                prim.Box(roof, dark, new Vector3(bx, roofY + 0.22f, 0.25f - 0.12f), new Vector3(0.035f, 0.26f, 0.03f), new Vector3(-36f, 0f, 0f), false);
+                prim.Box(roof, dark, new Vector3(bx, roofY + 0.22f, 0.25f + 0.12f), new Vector3(0.035f, 0.26f, 0.03f), new Vector3(36f, 0f, 0f), false);
+                float fx = -0.3f + sign * 0.685f;
+                prim.Box(roof, dark, new Vector3(fx, ridgeY + 0.08f, 0.25f), new Vector3(0.028f, 0.34f, 0.028f), new Vector3(30f, 0f, 0f), false);
+                prim.Box(roof, dark, new Vector3(fx, ridgeY + 0.08f, 0.25f), new Vector3(0.028f, 0.34f, 0.028f), new Vector3(-30f, 0f, 0f), false);
+            }
+
+            // thatch (or slate) courses across the front slope, and rafter tips under the eave
+            var course = art.NoOutline(level >= 3 ? Hex("#2c3a4d") : Hex("#a77a2c"), level >= 3 ? PaintedTexture.Roof : PaintedTexture.Thatch);
+            const float roofH = 0.52f, roofCurve = 0.3f, halfDepth = 0.725f;
+            foreach (float f in new[] { 0.3f, 0.55f, 0.8f })
+            {
+                float z = 0.25f - halfDepth * (1f - f);
+                float y = roofY + RoofSurface(roofH, roofCurve, f) + 0.012f;
+                float slope = Mathf.Atan2(RoofSurface(roofH, roofCurve, f + 0.05f) - RoofSurface(roofH, roofCurve, f - 0.05f), halfDepth * 0.1f) * Mathf.Rad2Deg;
+                prim.Box(roof, course, new Vector3(-0.3f, y, z), new Vector3(1.28f, 0.02f, 0.04f), new Vector3(-slope, 0f, 0f), false);
+            }
+            for (int i = 0; i < 9; i++)
+                prim.Box(roof, dark, new Vector3(-0.3f + (i - 4) * 0.15f, roofY - 0.02f, -0.56f), new Vector3(0.04f, 0.045f, 0.1f), default, false);
+
+            // rain barrel with hoops at the front-left corner, a bucket on the workbench
+            prim.Cylinder(props, wood, new Vector3(-0.82f, 0.16f, -0.52f), 0.1f, 0.22f);
+            prim.Cylinder(props, iron, new Vector3(-0.82f, 0.1f, -0.52f), 0.104f, 0.02f, default, false);
+            prim.Cylinder(props, iron, new Vector3(-0.82f, 0.22f, -0.52f), 0.104f, 0.02f, default, false);
+            prim.Cylinder(props, art.NoOutline(Palette.WaterShallow), new Vector3(-0.82f, 0.265f, -0.52f), 0.082f, 0.01f, default, false);
+            prim.Cylinder(body, wood, new Vector3(-0.52f, 0.375f, 0.5f), 0.055f, 0.09f);
+            prim.Cylinder(body, art.NoOutline(Palette.WaterShallow), new Vector3(-0.52f, 0.42f, 0.5f), 0.045f, 0.008f, default, false);
+
+            // sawdust under the sawhorse, a hand saw biting into its log, a stump to sit on and split kindling by the block
+            prim.Sphere(ground, art.NoOutline(Hex("#e6cd9a")), new Vector3(0.1f, 0.055f, -0.72f), new Vector3(0.5f, 0.02f, 0.4f), false);
+            prim.Box(props, steel, new Vector3(0.0f, 0.3f, -0.72f), new Vector3(0.3f, 0.075f, 0.012f), new Vector3(0f, 0f, -4f), false);
+            prim.Box(props, wood, new Vector3(0.2f, 0.32f, -0.72f), new Vector3(0.05f, 0.07f, 0.03f), default, false);
+            prim.Cylinder(props, art.Lit(Palette.TimberLight, PaintedTexture.Bark), new Vector3(0.6f, 0.12f, -0.82f), 0.1f, 0.14f);
+            prim.Cylinder(props, LogEndMat, new Vector3(0.6f, 0.192f, -0.82f), 0.088f, 0.01f, default, false);
+            for (int i = 0; i < 4; i++)
+            {
+                float a = (float)rng.NextDouble() * 180f;
+                prim.Box(props, art.Lit(Palette.LogEnd), new Vector3(-0.24f + i * 0.045f, 0.085f + (i % 2) * 0.05f, -0.47f + (i % 2) * 0.03f), new Vector3(0.07f, 0.07f, 0.2f), new Vector3(0f, a, 0f));
+            }
+            // a woven basket of wood chips beside the stump
+            prim.Cylinder(props, art.Lit(Hex("#b98a4a"), PaintedTexture.Thatch), new Vector3(0.85f, 0.115f, -0.75f), 0.09f, 0.13f);
+            prim.Cylinder(props, rope, new Vector3(0.85f, 0.18f, -0.75f), 0.095f, 0.02f, default, false);
+            prim.Sphere(props, art.Lit(Palette.LogEnd), new Vector3(0.85f, 0.185f, -0.75f), new Vector3(0.14f, 0.05f, 0.14f), false);
+            // a coil of rope on a peg at the left wall
+            prim.Cylinder(body, rope, new Vector3(-0.92f, 0.78f, 0.55f), 0.05f, 0.025f, new Vector3(0f, 0f, 90f), false);
+
+            if (level >= 2)
+            {
+                // lean-to: rafters under its roof, a cross brace and a second lantern
+                foreach (float z in new[] { -0.35f, -0.05f, 0.25f })
+                    prim.Box(roof, dark, new Vector3(0.6f, 0.575f, z), new Vector3(0.85f, 0.04f, 0.04f), new Vector3(0f, 0f, -14f), false);
+                prim.Box(body, dark, new Vector3(0.98f, 0.3f, -0.05f), new Vector3(0.04f, 0.04f, 0.7f), default, false);
+                PaperLantern(body, new Vector3(-0.83f, 0.72f, -0.26f), 0.65f);
+            }
+            if (level >= 3)
+            {
+                // hanging signboard under the porch roof with a gold emblem
+                foreach (float x in new[] { -0.86f, -0.7f })
+                    prim.Box(body, rope, new Vector3(x, 0.735f, -0.5f), new Vector3(0.012f, 0.06f, 0.012f), default, false);
+                prim.Box(body, art.Lit(Palette.BannerRed), new Vector3(-0.78f, 0.66f, -0.5f), new Vector3(0.24f, 0.17f, 0.025f), default, false);
+                prim.Cylinder(body, GoldTrimMat, new Vector3(-0.78f, 0.66f, -0.52f), 0.045f, 0.012f, new Vector3(90f, 0f, 0f), false);
+            }
         }
 
         // ---------------------------------------------------------------- Rice Paddy (2x2)
@@ -1050,6 +1160,13 @@ namespace AgeOfSakura.Game
 
         private GameObject Shrine(int level, int w, int d)
         {
+            prim.ThinBoxes = true; // plaques, rafter tips and streamers: flat boxes for everything hair-thin
+            try { return BuildShrine(level); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private GameObject BuildShrine(int level)
+        {
             var root = NewRoot("Shrine_Model", 2.2f, 1.7f);
             var ground = Group(root, "Ground");
             var body = Group(root, "Body");
@@ -1116,7 +1233,7 @@ namespace AgeOfSakura.Game
                 var fox = new GameObject("Kitsune").transform;
                 fox.SetParent(props, false);
                 fox.localPosition = new Vector3(sx * 0.42f, 0.09f, -0.05f);
-                fox.localRotation = Quaternion.Euler(0f, sx * -20f, 0f);
+                fox.localRotation = Quaternion.Euler(0f, 180f + sx * 20f, 0f); // facing the visitors, slightly turned in
                 prim.BoxOnGround(fox, StoneDarkMat, Vector3.zero, new Vector3(0.22f, 0.08f, 0.26f));
                 prim.Sphere(fox, white, new Vector3(0f, 0.2f, -0.02f), new Vector3(0.14f, 0.2f, 0.16f), false);
                 prim.Sphere(fox, white, new Vector3(0f, 0.34f, 0.0f), new Vector3(0.1f, 0.1f, 0.1f), false);
@@ -1127,7 +1244,161 @@ namespace AgeOfSakura.Game
 
             StoneLantern(props, new Vector3(-0.8f, 0.07f, 0.1f), 0.95f);
             StoneLantern(props, new Vector3(0.8f, 0.07f, 0.1f), 0.95f);
+            ShrineDetails(level, Rng("shrine_details"), ground, body, roof, props, trees);
             return root;
+        }
+
+        /// <summary>
+        /// Second pass over the shrine: layered plinth, side window and wall beams, rafter tips and corner finials, shimenawa over the door,
+        /// bell rope, raked gravel, water basin, torii plaque, fox faces; level 2 adds prayer plaques, nobori banners and eave lanterns,
+        /// level 3 gilded fittings, sake barrels, a finial on the roof and two more stone lanterns. Everything stays inside the footprint.
+        /// </summary>
+        private void ShrineDetails(int level, System.Random rng, Transform ground, Transform body, Transform roof, Transform props, Transform trees)
+        {
+            var wood = WoodMat;
+            var dark = FrameMat;
+            var black = art.Lit(Hex("#3a2a20"), PaintedTexture.Planks);
+            var white = art.Lit(Hex("#f6f1e4"));
+            var gold = GoldMat;
+            var water = art.NoOutline(Palette.WaterShallow);
+            var straw = ThatchMat;
+
+            // plinth: a wider lower course under the shrine base
+            prim.BoxOnGround(body, StoneDarkMat, new Vector3(0f, 0.09f, 0.5f), new Vector3(1.0f, 0.05f, 0.8f));
+
+            // left wall: glowing lattice window, a dark sill beam and a head beam running round the wall
+            Window(body, new Vector3(-0.335f, 0.44f, 0.5f), 0.2f, 0.14f, true);
+            prim.Box(body, dark, new Vector3(-0.345f, 0.25f, 0.5f), new Vector3(0.03f, 0.035f, 0.54f), default, false);
+            prim.Box(body, dark, new Vector3(0f, 0.25f, 0.245f), new Vector3(0.7f, 0.035f, 0.03f), default, false);
+            prim.Box(body, dark, new Vector3(-0.345f, 0.58f, 0.5f), new Vector3(0.03f, 0.04f, 0.54f), default, false);
+            prim.Box(body, dark, new Vector3(0f, 0.58f, 0.245f), new Vector3(0.7f, 0.04f, 0.03f), default, false);
+
+            // eave: rafter tips under the lip and a finial on every corner (dark tile caps; gilded from level 2)
+            for (int i = 0; i < 7; i++) // rafters run from the wall out under the eave
+                prim.Box(roof, dark, new Vector3(-0.4f + i * 0.133f, 0.63f, 0.12f), new Vector3(0.03f, 0.03f, 0.34f), default, false);
+            for (int i = 0; i < 6; i++)
+                prim.Box(roof, dark, new Vector3(-0.45f, 0.63f, 0.15f + i * 0.14f), new Vector3(0.34f, 0.03f, 0.03f), default, false);
+            var cornerCap = level >= 2 ? gold : black;
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var sz in new[] { -1f, 1f })
+                    prim.Sphere(roof, cornerCap, new Vector3(sx * 0.585f, 0.72f, 0.5f + sz * 0.515f), 0.022f);
+
+            // door: shimenawa rope with paper streamers (shide), a red head beam, the bell with a braided rope and a bell beam
+            prim.Cylinder(body, straw, new Vector3(0f, 0.545f, 0.215f), 0.016f, 0.5f, new Vector3(0f, 0f, 90f), false);
+            for (int i = 0; i < 4; i++)
+                prim.Box(body, white, new Vector3(-0.15f + i * 0.1f, 0.5f, 0.212f), new Vector3(0.04f, 0.07f, 0.01f), new Vector3(0f, 0f, i % 2 == 0 ? 10f : -10f), false);
+            prim.Box(body, RedMat, new Vector3(0f, 0.57f, 0.19f), new Vector3(0.24f, 0.03f, 0.04f), default, false);
+            prim.Cylinder(body, RedMat, new Vector3(0f, 0.33f, 0.18f), 0.02f, 0.06f, default, false);
+            prim.Cylinder(body, white, new Vector3(0.0f, 0.37f, 0.18f), 0.021f, 0.02f, default, false);
+
+            // raked gravel beside the path, a water basin (temizuya) with a bamboo ladle, stepping stones
+            var rake = art.NoOutline(Hex("#bfb497"));
+            foreach (float x in new[] { -0.69f, -0.64f, 0.64f, 0.69f })
+                prim.Box(ground, rake, new Vector3(x, 0.094f, -0.2f), new Vector3(0.014f, 0.004f, 0.6f), default, false);
+            prim.BoxOnGround(props, StoneDarkMat, new Vector3(-0.74f, 0.09f, -0.68f), new Vector3(0.3f, 0.12f, 0.2f));
+            prim.Box(props, water, new Vector3(-0.74f, 0.213f, -0.68f), new Vector3(0.24f, 0.01f, 0.14f), default, false);
+            var bamboo = art.Lit(Palette.Bamboo);
+            prim.Cylinder(props, bamboo, new Vector3(-0.74f, 0.235f, -0.68f), 0.01f, 0.24f, new Vector3(0f, 0f, 90f), false);
+            prim.Cylinder(props, bamboo, new Vector3(-0.66f, 0.245f, -0.68f), 0.022f, 0.045f, new Vector3(0f, 0f, 90f), false);
+            prim.Cylinder(props, bamboo, new Vector3(-0.84f, 0.3f, -0.74f), 0.014f, 0.2f);
+            prim.Cylinder(props, bamboo, new Vector3(-0.8f, 0.37f, -0.72f), 0.012f, 0.1f, new Vector3(0f, 25f, 75f), false);
+            var moss = art.Lit(Color.Lerp(ToonStyle.Moss, Palette.GrassDark, 0.3f));
+            StoneLine(ground, new Vector3(-0.88f, 0.1f, -0.2f), new Vector3(-0.88f, 0.1f, -0.9f), 3, 0.09f, rng, StoneMat);
+            StoneLine(ground, new Vector3(0.88f, 0.1f, -0.2f), new Vector3(0.88f, 0.1f, -0.9f), 3, 0.09f, rng, StoneMat);
+            prim.Sphere(ground, moss, new Vector3(0.88f, 0.135f, -0.55f), new Vector3(0.1f, 0.03f, 0.08f), false);
+
+            // torii: a gold name plaque between the beams and wedge keys where the lower beam meets the pillars
+            const float gx = 0.52f, gz = -0.55f;
+            prim.Box(props, black, new Vector3(0f, 1.06f, gz - 0.04f), new Vector3(0.17f, 0.12f, 0.02f), default, false);
+            prim.Box(props, gold, new Vector3(0f, 1.06f, gz - 0.055f), new Vector3(0.13f, 0.085f, 0.012f), default, false);
+            foreach (var sx in new[] { -1f, 1f })
+            {
+                prim.Box(props, black, new Vector3(sx * (gx + 0.08f), 1.0f, gz), new Vector3(0.03f, 0.11f, 0.05f), new Vector3(0f, 0f, sx * 8f), false);
+                prim.Cylinder(props, StoneDarkMat, new Vector3(sx * gx, 0.075f, gz), 0.095f, 0.06f);
+            }
+
+            // foxes (turned to face the visitors in BuildShrine): add a snout, eyes, tail and front legs
+            foreach (var sx in new[] { -1f, 1f })
+            {
+                var f = new GameObject("KitsuneDetail").transform;
+                f.SetParent(props, false);
+                f.localPosition = new Vector3(sx * 0.42f, 0.09f, -0.05f);
+                f.localRotation = Quaternion.Euler(0f, 180f + sx * 20f, 0f); // the fox looks along its local +z
+                var dk = art.NoOutline(Hex("#2a1d18"));
+                prim.Sphere(f, white, new Vector3(0f, 0.325f, 0.065f), new Vector3(0.05f, 0.045f, 0.06f), false);
+                prim.Sphere(f, dk, new Vector3(0f, 0.335f, 0.098f), 0.012f);
+                foreach (var ex in new[] { -1f, 1f })
+                    prim.Sphere(f, dk, new Vector3(ex * 0.026f, 0.352f, 0.05f), 0.009f);
+                prim.Sphere(f, white, new Vector3(0f, 0.2f, -0.115f), new Vector3(0.07f, 0.16f, 0.07f), false);
+                prim.Box(f, white, new Vector3(-0.03f, 0.11f, 0.06f), new Vector3(0.035f, 0.12f, 0.035f), default, false);
+                prim.Box(f, white, new Vector3(0.03f, 0.11f, 0.06f), new Vector3(0.035f, 0.12f, 0.035f), default, false);
+            }
+
+            if (level >= 2)
+            {
+                // prayer plaques (ema) on a small rack behind the left lantern
+                foreach (float z in new[] { 0.34f, 0.6f })
+                    prim.Cylinder(props, black, new Vector3(-0.84f, 0.34f, z), 0.02f, 0.5f);
+                prim.Box(props, black, new Vector3(-0.84f, 0.57f, 0.47f), new Vector3(0.06f, 0.035f, 0.34f), default, false);
+                prim.Box(props, RedMat, new Vector3(-0.84f, 0.6f, 0.47f), new Vector3(0.14f, 0.02f, 0.36f), new Vector3(0f, 0f, 0f), false);
+                for (int i = 0; i < 6; i++)
+                {
+                    var tint = i % 3 == 0 ? Palette.TimberLight : (i % 3 == 1 ? Hex("#d9b074") : Hex("#c28a52"));
+                    prim.Box(props, art.Lit(tint, PaintedTexture.Planks), new Vector3(-0.84f, 0.5f, 0.36f + i * 0.045f), new Vector3(0.014f, 0.085f, 0.05f), new Vector3(i % 2 == 0 ? 6f : -6f, 0f, 0f), false);
+                }
+
+                // one nobori banner at the right of the entrance (a left one would hide the fox)
+                foreach (var sx in new[] { 1f })
+                {
+                    float px = sx * 0.86f;
+                    prim.Cylinder(props, black, new Vector3(px, 0.5f, -0.3f), 0.015f, 0.82f);
+                    prim.Box(props, black, new Vector3(px - sx * 0.09f, 0.9f, -0.3f), new Vector3(0.2f, 0.014f, 0.014f), default, false);
+                    prim.Box(props, white, new Vector3(px - sx * 0.09f, 0.6f, -0.3f), new Vector3(0.15f, 0.55f, 0.012f), default, false);
+                    prim.Box(props, RedMat, new Vector3(px - sx * 0.09f, 0.86f, -0.304f), new Vector3(0.15f, 0.06f, 0.014f), default, false);
+                    prim.Box(props, RedMat, new Vector3(px - sx * 0.09f, 0.62f, -0.304f), new Vector3(0.05f, 0.22f, 0.014f), default, false);
+                    prim.Sphere(props, gold, new Vector3(px, 0.935f, -0.3f), 0.022f);
+                }
+
+                // paper lanterns under the front eave
+                foreach (var sx in new[] { -1f, 1f })
+                    PaperLantern(roof, new Vector3(sx * 0.56f, 0.52f, 0.02f), 0.55f);
+            }
+
+            if (level >= 3)
+            {
+                // sake barrels (komodaru) with straw wrap and rope bands, stacked at the right side of the shrine
+                var barrel = art.Lit(Hex("#c9953c"), PaintedTexture.Thatch);
+                var rope = art.Lit(Hex("#b79a6a"));
+                foreach (float z in new[] { 0.37f, 0.55f })
+                    StackedBarrel(props, barrel, rope, new Vector3(0.78f, 0.09f, z));
+                StackedBarrel(props, barrel, rope, new Vector3(0.78f, 0.23f, 0.46f));
+
+                // gilded fittings: finial on the roof, caps on the fence posts, golden bell
+                prim.Cone(roof, gold, new Vector3(0f, 1.145f, 0.5f), 0.022f, 0.13f);
+                foreach (var sx in new[] { -1f, 1f })
+                    for (int i = 0; i < 4; i++)
+                        prim.Sphere(body, gold, new Vector3(sx * 0.6f, 0.405f, 0.3f + i * 0.17f), 0.02f);
+
+                // two more stone lanterns where the path meets the gravel
+                StoneLantern(props, new Vector3(-0.34f, 0.07f, -0.86f), 0.8f);
+                StoneLantern(props, new Vector3(0.34f, 0.07f, -0.86f), 0.8f);
+            }
+
+            if (Props != null)
+            {
+                // a blossom shrub and a green one in the back corners, out of the fence's way
+                BlossomBush(trees, new Vector3(-0.86f, 0f, 0.86f), 0.75f, rng);
+                Bush(trees, new Vector3(0.86f, 0f, 0.86f), 0.7f, rng);
+            }
+        }
+
+        /// <summary>A small straw-wrapped sake barrel standing upright: body, two rope bands and a lid.</summary>
+        private void StackedBarrel(Transform parent, Material barrel, Material rope, Vector3 basePos)
+        {
+            prim.Cylinder(parent, barrel, basePos + new Vector3(0f, 0.07f, 0f), 0.085f, 0.14f);
+            foreach (float y in new[] { 0.035f, 0.105f })
+                prim.Cylinder(parent, rope, basePos + new Vector3(0f, y, 0f), 0.089f, 0.014f, default, false);
+            prim.Cylinder(parent, art.Lit(Palette.LogEnd), basePos + new Vector3(0f, 0.143f, 0f), 0.07f, 0.008f, default, false);
         }
 
         private void StoneLantern(Transform parent, Vector3 basePos, float scale)

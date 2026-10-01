@@ -219,9 +219,9 @@ namespace AgeOfSakura.Tests
         {
             var actors = new ActorFactory(art, prim);
             for (int variant = 0; variant < ActorFactory.VillagerVariants; variant++)
-                CountActor($"villager {variant}", actors.Villager(variant), 6000, 60);
-            CountActor("dog", actors.Dog(), 4000, 40);
-            CountActor("hen", actors.Chicken(true), 3000, 40);
+                CountActor($"villager {variant}", actors.Villager(variant), 9500, 80);
+            CountActor("dog", actors.Dog(), 7000, 60);
+            CountActor("hen", actors.Chicken(true), 5500, 60);
         }
 
         private void CountActor(string name, ActorVisual actor, int maxTriangles, int maxRenderers)

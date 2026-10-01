@@ -92,8 +92,12 @@ namespace AgeOfSakura.Game
                 animals[i].Animate(NpcState.Idle, 0.5f, 0f);
             }
             yield return Photo("animals_idle", At(0f, 0f) + Vector3.up * 0.16f, 0.5f);
-            for (int i = 0; i < animals.Length; i++) animals[i].Animate(NpcState.Walking, 1f, 0.4f);
-            yield return Photo("animals_walk", At(0f, 0f) + Vector3.up * 0.16f, 0.5f);
+            // four phases a quarter stride apart (dog cycle 0.52, hens 0.45)
+            for (int step = 0; step < 4; step++)
+            {
+                for (int i = 0; i < animals.Length; i++) animals[i].Animate(NpcState.Walking, 1f + step * 0.1f, 0.4f + step * 0.12f);
+                yield return Photo(step == 0 ? "animals_walk" : "animals_walk_" + step, At(0f, 0f) + Vector3.up * 0.16f, 0.5f);
+            }
             foreach (var a in animals) UnityEngine.Object.Destroy(a.Root);
         }
 
