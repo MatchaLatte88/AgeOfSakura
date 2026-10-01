@@ -28,7 +28,36 @@ namespace AgeOfSakura.Game
             }
         }
 
-        private static void MergeGroup(Transform group)
+        /// <summary>
+        /// Merges only the meshes of the direct children of <paramref name="pivot"/> (one mesh per material and shadow mode). Child pivots, which
+        /// animate on their own, are left alone: for jointed characters, where every bone keeps a few merged meshes instead of dozens of renderers.
+        /// </summary>
+        public static void MergeDirect(Transform pivot)
+        {
+            var buckets = new Dictionary<(int, int), List<CombineInstance>>();
+            var materials = new Dictionary<(int, int), Key>();
+            var sources = new List<GameObject>();
+            var toLocal = pivot.worldToLocalMatrix;
+            for (int i = 0; i < pivot.childCount; i++)
+            {
+                var child = pivot.GetChild(i);
+                var filter = child.GetComponent<MeshFilter>();
+                var renderer = child.GetComponent<MeshRenderer>();
+                if (filter == null || renderer == null || filter.sharedMesh == null || renderer.sharedMaterial == null || !child.gameObject.activeSelf) continue;
+                var key = (renderer.sharedMaterial.GetInstanceID(), (int)renderer.shadowCastingMode);
+                if (!buckets.TryGetValue(key, out var list))
+                {
+                    buckets[key] = list = new List<CombineInstance>();
+                    materials[key] = new Key { Material = renderer.sharedMaterial, Shadows = renderer.shadowCastingMode };
+                }
+                list.Add(new CombineInstance { mesh = filter.sharedMesh, transform = toLocal * child.localToWorldMatrix });
+                sources.Add(child.gameObject);
+            }
+            Emit(pivot, buckets, materials, sources);
+        }
+
+        /// <summary>Merges every active mesh under <paramref name="group"/> into one mesh per (material, shadow mode); the sources are destroyed.</summary>
+        public static void MergeGroup(Transform group)
         {
             var buckets = new Dictionary<(int, int), List<CombineInstance>>();
             var materials = new Dictionary<(int, int), Key>();
@@ -49,6 +78,11 @@ namespace AgeOfSakura.Game
                 sources.Add(filter.gameObject);
             }
 
+            Emit(group, buckets, materials, sources);
+        }
+
+        private static void Emit(Transform group, Dictionary<(int, int), List<CombineInstance>> buckets, Dictionary<(int, int), Key> materials, List<GameObject> sources)
+        {
             foreach (var pair in buckets)
             {
                 var info = materials[pair.Key];

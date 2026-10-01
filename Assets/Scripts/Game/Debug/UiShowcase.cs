@@ -32,6 +32,10 @@ namespace AgeOfSakura.Game
             public PlacementController Placement;
             public IsoCameraController Camera;
             public BuildingViewManager Views;
+            public GameArt Art;
+            public Prim Prim;
+            public PropFactory Props;
+            public ActorFactory Actors;
         }
 
         public static bool TryParse(out Options options)
@@ -90,9 +94,11 @@ namespace AgeOfSakura.Game
             Directory.CreateDirectory(options.OutputDirectory);
             yield return new WaitForSecondsRealtime(1.0f);
             // screenshots must not catch buildings half-way through their construction animation (the "buildin" walkthrough does on purpose)
-            BuildInAnimation.SpeedMultiplier = options.States == "style" ? 1000f : 1f;
+            BuildInAnimation.SpeedMultiplier = options.States == "style" || options.States == "hall" ? 1000f : 1f;
             if (options.States == "game") PrepareGameplayWorld();
             else if (options.States == "style") PrepareStyleWorld();
+            else if (options.States == "hall") PrepareHallWorld();
+            else if (options.States == "gallery") { }
             else PrepareWorld();
 
             foreach (var res in options.Resolutions)
@@ -102,6 +108,8 @@ namespace AgeOfSakura.Game
                 tag = $"{(options.Language == Language.German ? "de" : "en")}_{res.x}x{res.y}";
                 if (options.States == "game") yield return RunGameplay();
                 else if (options.States == "style") yield return RunStyle();
+                else if (options.States == "hall") yield return RunHall();
+                else if (options.States == "gallery") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).Run();
                 else yield return RunStates();
             }
 
@@ -158,6 +166,33 @@ namespace AgeOfSakura.Game
             yield return new WaitForSecondsRealtime(1.6f);     // the zoom pivot keeps pulling the focus until the size has settled
             ctx.Camera.FrameOn(world);
             yield return new WaitForSecondsRealtime(0.4f);
+        }
+
+        private void PrepareHallWorld()
+        {
+            var s = ctx.Session;
+            foreach (var b in s.Buildings.All) if (b.DefinitionId == s.Definitions.Map.TownHallId) hallId = b.InstanceId;
+        }
+
+        /// <summary>Quick Town Hall review (all three looks, close and wide) without rendering the rest of the style showcase.</summary>
+        private IEnumerator RunHall()
+        {
+            ctx.Ui.CloseAllPanels();
+            var hall = ctx.Session.Buildings.Get(hallId);
+            var hallCenter = new Vector3(hall.Origin.X + 2.6f, 0f, hall.Origin.Z + 2.6f); // the tower rises above its footprint: aim beyond it so the top stays in view
+            for (int level = 1; level <= 3; level++)
+            {
+                hall.Level = level;
+                ctx.Views.Rebuild(hall);
+                yield return CloseUp(hallCenter, 3.4f);
+                yield return Shot($"h{level}_close", 0.6f);
+            }
+            hall.Level = 2;
+            ctx.Views.Rebuild(hall);
+            yield return CloseUp(hallCenter, 3.8f);
+            yield return Shot("h2_wide", 0.6f);
+            yield return CloseUp(hallCenter + new Vector3(2.4f, 0f, 2.4f), 2.6f);
+            yield return Shot("h2_top", 0.6f);
         }
 
         private IEnumerator RunStyle()

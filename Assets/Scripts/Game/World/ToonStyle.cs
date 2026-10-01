@@ -70,6 +70,11 @@ namespace AgeOfSakura.Game
         public const int FoliageSubdivisionsNear = 2;
         public const int FoliageSubdivisionsFar = 1;
         public const float LeafCardAlphaTest = 0.45f;
+        /// <summary>
+        /// DEVIATION (needs Fred's approval): outline width of foliage relative to the style's width. A crown is dozens of overlapping clumps and
+        /// full-width contours turn it into a heap of outlined pebbles; a thinner line keeps the silhouette and lets the leaf mass read as one.
+        /// </summary>
+        public const float FoliageOutlineScale = 0.5f;
 
         // ---- animation ----
         public const float BuildInSeconds = 4.4f;
@@ -85,6 +90,14 @@ namespace AgeOfSakura.Game
         private static readonly int FoliageTint = Shader.PropertyToID("_AoS_FoliageTint");
         private static readonly int GradientId = Shader.PropertyToID("_AoS_Gradient");
         private static readonly int ParamsId = Shader.PropertyToID("_AoS_Params");
+        private static readonly int GradeId = Shader.PropertyToID("_AoS_Grade");
+
+        /// <summary>
+        /// DEVIATION (needs Fred's approval): colour grade applied at the end of the toon shader, x = saturation delta, y = S-curve contrast,
+        /// z = warm highlights / cool shadows. Takes the candy edge off the palette so the scene reads closer to daylight photography.
+        /// </summary>
+        public static readonly Vector4 DayGrade = new Vector4(-0.32f, 0.2f, 0.06f, 0f);
+        public static readonly Vector4 NightGrade = new Vector4(-0.1f, 0.12f, 0f, 0f);
 
         /// <summary>Colour as a shader vector in the space the toon shader computes lighting in (linear).</summary>
         public static Vector4 ToLinearVector(Color c, float scale = 1f)
@@ -107,6 +120,7 @@ namespace AgeOfSakura.Game
             Shader.SetGlobalVector(GradientId, new Vector4(GradientValues[0], GradientValues[1], GradientValues[2], 0f));
             // foliage is lit by baked vertex colours; night only tints them
             Shader.SetGlobalVector(ParamsId, new Vector4(night ? 1.9f : 1f, 0f, 0f, 0f));
+            Shader.SetGlobalVector(GradeId, night ? NightGrade : DayGrade);
             Shader.SetGlobalVector(FoliageTint, night ? new Vector4(0.42f, 0.5f, 0.85f, 1f) : Vector4.one);
 
             if (sun == null) return;

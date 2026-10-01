@@ -88,7 +88,8 @@ namespace AgeOfSakura.Game
             var world = new WorldBuilder(art, prim, props, animator).Build(runtimeRoot.transform, session);
 
             views = new BuildingViewManager(session, world, art, prim, models, vfx, cameraController.Rotation);
-            NpcManager.Create(runtimeRoot.transform, session, new ActorFactory(art, prim));
+            var actors = new ActorFactory(art, prim);
+            NpcManager.Create(runtimeRoot.transform, session, actors);
 
             IAudioService audio = new NullAudioService();
             var selection = new SelectionController(session, cameraController, views, audio);
@@ -108,7 +109,8 @@ namespace AgeOfSakura.Game
             {
                 UiShowcase.Begin(runtimeRoot, showcaseOptions, new UiShowcase.Context
                 {
-                    Session = session, Ui = ui, Selection = selection, Placement = placement, Camera = cameraController, Views = views
+                    Session = session, Ui = ui, Selection = selection, Placement = placement, Camera = cameraController, Views = views,
+                    Art = art, Prim = prim, Props = props, Actors = actors
                 });
             }
 
@@ -142,15 +144,24 @@ namespace AgeOfSakura.Game
 
         private void WireInput(GameDefinitions defs, SelectionController selection, PlacementController placement)
         {
+            // Pressing a ready building collects at once; keep holding and sweep over the others to collect them too (no sheet, no camera pan).
+            var sweep = new CollectSweep(selection);
+            input.PressInterceptor = sweep;
+            input.PressBegan += position =>
+            {
+                if (!placement.IsActive) sweep.Press(position);
+            };
+
             input.Tapped += position =>
             {
+                if (sweep.Armed) return; // the press itself already collected
                 if (placement.IsActive) placement.HandleTap(position);
                 else selection.HandleTap(position);
             };
 
             input.LongPressed += position =>
             {
-                if (placement.IsActive) return;
+                if (placement.IsActive || sweep.Armed) return;
                 if (!selection.TryGetBuildingAt(position, out var view)) return;
                 var instance = session.Buildings.Get(view.InstanceId);
                 if (!session.Buildings.GetDefinition(instance).Movable) return;

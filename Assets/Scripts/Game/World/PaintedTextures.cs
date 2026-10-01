@@ -17,7 +17,9 @@ namespace AgeOfSakura.Game
         Planks,
         LeafCard,
         LogEnd,
-        Shoji
+        Shoji,
+        RoofTiles,
+        BlossomCard
     }
 
     /// <summary>
@@ -54,6 +56,7 @@ namespace AgeOfSakura.Game
                 case PaintedTexture.Planks: return 2.0f;
                 case PaintedTexture.LogEnd: return 6.0f;
                 case PaintedTexture.Shoji: return 6.5f;
+                case PaintedTexture.RoofTiles: return 1f; // sampled through uv0: the roof meshes carry their own tile coordinates
                 default: return 1f;
             }
         }
@@ -75,7 +78,7 @@ namespace AgeOfSakura.Game
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true)
             {
                 name = "Painted_" + kind,
-                wrapMode = kind == PaintedTexture.LeafCard ? TextureWrapMode.Clamp : TextureWrapMode.Repeat,
+                wrapMode = kind == PaintedTexture.LeafCard || kind == PaintedTexture.BlossomCard ? TextureWrapMode.Clamp : TextureWrapMode.Repeat,
                 filterMode = FilterMode.Bilinear,
                 anisoLevel = 1
             };
@@ -99,6 +102,8 @@ namespace AgeOfSakura.Game
                 case PaintedTexture.Planks: return Planks(u, v);
                 case PaintedTexture.LogEnd: return LogEnd(u, v);
                 case PaintedTexture.Shoji: return Shoji(u, v);
+                case PaintedTexture.RoofTiles: return RoofTiles(u, v);
+                case PaintedTexture.BlossomCard: return BlossomCard(u, v);
                 default: return LeafCard(u, v);
             }
         }
@@ -206,6 +211,29 @@ namespace AgeOfSakura.Game
             return Grey(Mathf.Clamp01(g));
         }
 
+        /// <summary>
+        /// Kawara roof: columns of flat tiles separated by rounded cover tiles (light crown, dark valleys), rows overlapping downhill.
+        /// Meant for uv0 with v running up the slope, so the columns always flow down the roof.
+        /// </summary>
+        private static Color RoofTiles(float u, float v)
+        {
+            const float cols = 4f, rows = 7f;
+            float cu = u * cols;
+            int col = Mathf.FloorToInt(cu);
+            float fx = cu - col;
+            float rv = v * rows;
+            int row = Mathf.FloorToInt(rv);
+            float fy = rv - row;
+            float g = 0.7f + Hash(col % 4 + row * 7, 11) * 0.1f;
+            g += Mathf.Clamp01(1f - Mathf.Abs(fx) / 0.16f) * 0.3f;           // crown of the cover tile (u = 0 seam of the tile)
+            g += Mathf.Clamp01(1f - Mathf.Abs(fx - 1f) / 0.16f) * 0.3f;
+            g -= Mathf.Clamp01(1f - Mathf.Abs(fx - 0.2f) / 0.06f) * 0.3f;    // valley beside the cover tile
+            g -= Mathf.Clamp01(1f - Mathf.Abs(fx - 0.8f) / 0.06f) * 0.3f;
+            g -= Mathf.Clamp01(1f - fy / 0.18f) * 0.3f;                       // shadow under the overlapping row above
+            g += Mathf.Clamp01((fy - 0.75f) / 0.25f) * 0.08f;
+            return Grey(Mathf.Clamp01(g));
+        }
+
         private static Color Planks(float u, float v)
         {
             float p = u * 3f;
@@ -242,38 +270,65 @@ namespace AgeOfSakura.Game
             return Grey(Mathf.Lerp(paper, 0.42f, lattice));
         }
 
+        // A spray of leaves fanning out of one point at the bottom: (angle from vertical in degrees, length, half width).
         private static readonly Vector3[] Leaves =
         {
-            new Vector3(0.50f, 0.50f, 0f), new Vector3(0.30f, 0.66f, 35f), new Vector3(0.70f, 0.68f, -30f),
-            new Vector3(0.28f, 0.34f, -40f), new Vector3(0.72f, 0.32f, 40f), new Vector3(0.50f, 0.80f, 5f),
-            new Vector3(0.50f, 0.22f, -8f)
+            new Vector3(-74f, 0.34f, 0.115f), new Vector3(70f, 0.35f, 0.115f), new Vector3(-48f, 0.4f, 0.13f), new Vector3(46f, 0.41f, 0.13f),
+            new Vector3(-24f, 0.46f, 0.14f), new Vector3(22f, 0.47f, 0.14f), new Vector3(-6f, 0.52f, 0.14f), new Vector3(12f, 0.43f, 0.13f),
+            new Vector3(0f, 0.56f, 0.15f)
         };
 
         private static Color LeafCard(float u, float v)
         {
-            // a cluster of pointed leaves; outside the leaves the alpha is 0 (cut out by the shader at 0.45)
-            float best = 0f;
-            float shade = 0.8f;
+            // overlapping pointed leaves with a midrib and a light tip; outside them the alpha is 0 (cut out by the shader at 0.45)
+            float shade = 0f;
+            bool hit = false;
             for (int i = 0; i < Leaves.Length; i++)
             {
                 var l = Leaves[i];
-                float a = l.z * Mathf.Deg2Rad;
-                float dx = u - l.x, dy = v - l.y;
-                float rx = dx * Mathf.Cos(a) + dy * Mathf.Sin(a);
-                float ry = -dx * Mathf.Sin(a) + dy * Mathf.Cos(a);
-                float e = (rx * rx) / (0.085f * 0.085f) + (ry * ry) / (0.2f * 0.2f);
-                // pointed tip: squeeze the width towards both ends
-                e += Mathf.Abs(ry) * 6f * Mathf.Abs(rx) / 0.085f;
-                float inside = 1f - e;
-                if (inside > best)
-                {
-                    best = inside;
-                    float vein = Mathf.Abs(rx) < 0.008f ? 0.08f : 0f;
-                    shade = 0.86f + Hash(i, 29) * 0.14f - vein;
-                }
+                float a = l.x * Mathf.Deg2Rad;
+                float dx = u - 0.5f, dy = v - 0.06f;
+                float along = dx * Mathf.Sin(a) + dy * Mathf.Cos(a);             // distance along the leaf
+                float across = dx * Mathf.Cos(a) - dy * Mathf.Sin(a);            // distance from its midrib
+                if (along < 0f || along > l.y) continue;
+                float f = along / l.y;
+                float width = l.z * Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Pow(f, 0.75f)), 0.85f);
+                if (Mathf.Abs(across) > width) continue;
+                hit = true;
+                float g = 0.78f + 0.2f * f + Hash(i, 29) * 0.08f;                  // base dark, tip light
+                g -= Mathf.Clamp01((Mathf.Abs(across) / Mathf.Max(width, 0.001f) - 0.72f) * 3f) * 0.16f; // darker rim
+                if (Mathf.Abs(across) < 0.006f) g -= 0.1f;                         // midrib
+                shade = g;
             }
-            float alpha = best > 0f ? 1f : 0f;
-            return new Color(shade, shade, shade, alpha);
+            return new Color(Mathf.Clamp01(shade), Mathf.Clamp01(shade), Mathf.Clamp01(shade), hit ? 1f : 0f);
+        }
+
+        private static readonly Vector3[] Flowers =
+        {
+            new Vector3(0.5f, 0.5f, 0.15f), new Vector3(0.26f, 0.64f, 0.11f), new Vector3(0.74f, 0.66f, 0.12f), new Vector3(0.3f, 0.3f, 0.1f),
+            new Vector3(0.72f, 0.3f, 0.11f), new Vector3(0.5f, 0.8f, 0.09f), new Vector3(0.5f, 0.2f, 0.09f)
+        };
+
+        private static Color BlossomCard(float u, float v)
+        {
+            // a truss of five-petal flowers: rounded petals with a darker heart, lighter edges
+            float shade = 0f;
+            bool hit = false;
+            for (int i = 0; i < Flowers.Length; i++)
+            {
+                var f = Flowers[i];
+                float dx = u - f.x, dy = v - f.y;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float ang = Mathf.Atan2(dy, dx) + i * 0.9f;
+                float edge = f.z * (0.62f + 0.38f * Mathf.Abs(Mathf.Cos(2.5f * ang)));
+                if (r > edge) continue;
+                hit = true;
+                float k = r / edge;
+                shade = 0.8f + 0.2f * k * k + Hash(i, 31) * 0.05f;
+                if (r < f.z * 0.16f) shade = 0.62f;                                 // stamens
+                if (Mathf.Abs(Mathf.Cos(2.5f * ang)) < 0.05f && k > 0.2f) shade -= 0.1f; // notch between petals
+            }
+            return new Color(Mathf.Clamp01(shade), Mathf.Clamp01(shade), Mathf.Clamp01(shade), hit ? 1f : 0f);
         }
 
         // ------------------------------------------------------------------ noise

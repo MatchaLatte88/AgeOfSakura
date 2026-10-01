@@ -50,6 +50,21 @@ namespace AgeOfSakura.Tests
         }
 
         [Test]
+        public void PressBegan_FiresOnTouchDown_BeforeTheGestureIsKnown_ButNotOverUi()
+        {
+            recognizer.PressBegan += p => events.Add("press");
+            Frame(0.016f, (1, 100, 100));
+            CollectionAssert.AreEqual(new[] { "press" }, events);
+
+            Frame(0.05f);
+            events.Clear();
+            overUi = true;
+            Frame(0.016f, (1, 100, 100));
+            Frame(0.05f);
+            CollectionAssert.IsEmpty(events, "a press on UI never reaches the world");
+        }
+
+        [Test]
         public void SmallMovement_StaysATap()
         {
             Frame(0.016f, (1, 100, 100));

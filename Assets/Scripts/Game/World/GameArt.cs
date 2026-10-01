@@ -94,6 +94,19 @@ namespace AgeOfSakura.Game
         /// <summary>Toon material with a painted texture projected along the dominant axis (tile size from <see cref="PaintedTextures"/>).</summary>
         public Material Lit(Color color, PaintedTexture texture) => Toon(color, texture, false, true, default);
 
+        /// <summary>Toon material with a painted texture sampled through uv0 and the outline (roof slopes: their uv follows the shape).</summary>
+        public Material LitUv(Color color, PaintedTexture texture)
+        {
+            var key = (Pack(color), (int)texture + 200, 2, 0, 0);
+            if (toonCache.TryGetValue(key, out var cached)) return cached;
+            var m = NewToon("ToonUv", color);
+            m.SetFloat(TexModeId, 2f);
+            m.SetTexture(BaseMapId, PaintedTextures.Get(texture));
+            m.name += "_" + ColorUtility.ToHtmlStringRGB(color);
+            toonCache[key] = m;
+            return m;
+        }
+
         /// <summary>Toon material without the outline (ground, tiny details, distant scenery).</summary>
         public Material NoOutline(Color color) => Toon(color, null, false, false, default);
 
@@ -106,14 +119,14 @@ namespace AgeOfSakura.Game
         public Material Foliage(Color tint, bool outline = true) => Toon(tint, null, true, outline, default);
 
         /// <summary>Camera-facing leaf cards: painted cutout texture, double sided, no outline, no shadow.</summary>
-        public Material LeafCards(Color tint)
+        public Material LeafCards(Color tint, PaintedTexture texture = PaintedTexture.LeafCard)
         {
-            var key = (Pack(tint), (int)PaintedTexture.LeafCard + 100, 0x8, 0, 0);
+            var key = (Pack(tint), (int)texture + 100, 0x8, 0, 0);
             if (toonCache.TryGetValue(key, out var cached)) return cached;
             var m = NewToon("LeafCards", tint);
             m.SetFloat(UnlitId, 1f);
             m.SetFloat(TexModeId, 2f);
-            m.SetTexture(BaseMapId, PaintedTextures.Get(PaintedTexture.LeafCard));
+            m.SetTexture(BaseMapId, PaintedTextures.Get(texture));
             m.SetFloat(CutoffId, ToonStyle.LeafCardAlphaTest);
             m.SetFloat(CullId, (float)CullMode.Off);
             m.SetShaderPassEnabled(OutlinePass, false);
@@ -148,6 +161,7 @@ namespace AgeOfSakura.Game
             }
             if (glow.a > 0f) m.SetColor(EmissionId, glow);
             if (!outline) m.SetShaderPassEnabled(OutlinePass, false);
+            else if (foliage) m.SetFloat(OutlineThicknessId, ToonStyle.OutlineThickness * ToonStyle.FoliageOutlineScale);
             m.name += "_" + ColorUtility.ToHtmlStringRGB(color);
             toonCache[key] = m;
             return m;

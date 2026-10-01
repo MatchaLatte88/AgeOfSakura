@@ -120,6 +120,8 @@ namespace AgeOfSakura.Game
         private Material ThatchDarkMat => art.Lit(Palette.StrawDark, PaintedTexture.Thatch);
         private Material SlateMat => art.Lit(Palette.RoofTile, PaintedTexture.Roof);
         private Material SlateLightMat => art.Lit(Palette.RoofTileLight, PaintedTexture.Roof);
+        /// <summary>Tile roof whose uv follows the slope (columns of tiles flow down every side), for the lofted pagoda roofs.</summary>
+        private Material SlateUvMat => art.LitUv(Palette.RoofTile, PaintedTexture.RoofTiles);
         private Material RedMat => art.Lit(Palette.BannerRed, PaintedTexture.Planks);
         private Material GoldMat => art.Lit(Palette.Gold);
         private Material LogEndMat => art.Lit(Palette.LogEnd, PaintedTexture.LogEnd);
@@ -252,9 +254,204 @@ namespace AgeOfSakura.Game
             }
         }
 
-        // ---------------------------------------------------------------- Town Hall (3x3), levels 1..3 = 2..4 roof tiers
+        // ---------------------------------------------------------------- Town Hall (3x3), levels 1..3 = 2..4 storeys of a castle-like tower
+        //
+        // Modelled after the reference art: stone terrace with a stair on each of the two faces the camera sees, red-pillared veranda around a
+        // white plaster ground floor, upper storeys in dark timber and plaster, dark blue-grey tile roofs that sag and swing up at the corners
+        // (hip ridges in lighter tile, gold edge lines and corner tips), a cusped karahafu gable in front of every roof, golden shachihoko
+        // on the top ridge and nobori banners on the terrace. Everything is built once for the -Z face and mirrored onto the -X face by a
+        // 90 degree pivot, so the detail cost and the look are the same on both sides.
+
+        private static Transform Pivot(Transform parent, float yaw)
+        {
+            var t = new GameObject("Face").transform;
+            t.SetParent(parent, false);
+            t.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            return t;
+        }
+
+        private Material GoldTrimMat => art.NoOutline(Palette.Gold);
+
+        /// <summary>Ring parameter of the golden tip at each eave corner (just inside the up-flicked lip).</summary>
+        private const float PagodaTip = -0.03f;
+
+        /// <summary>Golden shachihoko (fish with a tail curled over its head) on a ridge end; sign +1 for the +X end, -1 for the -X end.</summary>
+        private void Shachihoko(Transform t, Vector3 pos, float sign, float s)
+        {
+            var gold = GoldMat;
+            var pts = new[]
+            {
+                new Vector3(0f, 0.02f, 0f), new Vector3(0.012f, 0.10f, 0f), new Vector3(0f, 0.19f, 0f),
+                new Vector3(-0.06f, 0.26f, 0f), new Vector3(-0.13f, 0.28f, 0f), new Vector3(-0.19f, 0.24f, 0f)
+            };
+            var radii = new[] { 0.05f, 0.047f, 0.04f, 0.03f, 0.021f, 0.011f };
+            for (int i = 0; i < pts.Length; i++)
+            {
+                pts[i] = new Vector3(pts[i].x * sign, pts[i].y, pts[i].z) * s;
+                radii[i] *= s;
+            }
+            prim.MeshObject(t, ProceduralMeshes.Tube(pts, radii, 6), gold, pos);
+            prim.Sphere(t, gold, pos + new Vector3(sign * 0.045f, 0.05f, 0f) * s, new Vector3(0.13f, 0.1f, 0.1f) * s);
+            var snout = prim.Cone(t, gold, pos + new Vector3(sign * 0.09f, 0.055f, 0f) * s, 0.03f * s, 0.07f * s);
+            snout.transform.localRotation = Quaternion.Euler(0f, 0f, -sign * 70f);
+            for (int k = 1; k <= 3; k++)
+            {
+                var spike = prim.Cone(t, gold, pos + pts[k] + new Vector3(sign * radii[k] * 0.9f, 0f, 0f), 0.014f * s, 0.055f * s);
+                spike.transform.localRotation = Quaternion.Euler(0f, 0f, -sign * (35f + k * 15f));
+            }
+            prim.Sphere(t, gold, pos + pts[5] + new Vector3(-sign * 0.02f, 0.012f, 0f) * s, new Vector3(0.07f, 0.02f, 0.05f) * s, false);
+        }
+
+        /// <summary>Tall golden finial (rings and a flame tip) on the very top of the tower.</summary>
+        private void Finial(Transform t, Vector3 pos, float s)
+        {
+            var gold = GoldMat;
+            prim.Cylinder(t, gold, pos + new Vector3(0f, 0.02f * s, 0f), 0.075f * s, 0.04f * s);
+            prim.Cylinder(t, gold, pos + new Vector3(0f, 0.07f * s, 0f), 0.045f * s, 0.06f * s);
+            prim.Sphere(t, gold, pos + new Vector3(0f, 0.13f * s, 0f), 0.055f * s);
+            for (int k = 0; k < 4; k++)
+                prim.Cylinder(t, gold, pos + new Vector3(0f, (0.19f + 0.06f * k) * s, 0f), (0.062f - 0.009f * k) * s, 0.024f * s);
+            prim.Cone(t, gold, pos + new Vector3(0f, 0.2f * s, 0f), 0.02f * s, 0.34f * s);
+            prim.Sphere(t, gold, pos + new Vector3(0f, 0.5f * s, 0f), 0.034f * s);
+            prim.Cone(t, gold, pos + new Vector3(0f, 0.51f * s, 0f), 0.02f * s, 0.09f * s);
+        }
+
+        /// <summary>
+        /// Cusped gable sitting on a roof slope: plaster board with a gold-edged round window, slate cap swept back up the slope.
+        /// Local frame: origin on the roof surface, -Z outwards, the cap runs along +Z (and rises by <paramref name="rise"/>).
+        /// </summary>
+        private void HallGable(Transform roof, Vector3 origin, float width, float height, float run, float rise)
+        {
+            var curve = ProceduralMeshes.KarahafuCurve(width, height);
+            prim.MeshObject(roof, ProceduralMeshes.GableBoard(curve, 0.17f, 0.05f), PlasterMat, origin);
+            prim.MeshObject(roof, ProceduralMeshes.GableCap(curve, 0.045f, run, rise, 0.04f), SlateUvMat, origin);
+
+            // gold bargeboard edge and end tips
+            var edge = new Vector3[curve.Length];
+            var radii = new float[curve.Length];
+            for (int i = 0; i < curve.Length; i++)
+            {
+                edge[i] = new Vector3(curve[i].x, curve[i].y + 0.045f + 0.012f, -0.045f * 0.9f - 0.012f);
+                radii[i] = 0.017f;
+            }
+            prim.MeshObject(roof, ProceduralMeshes.Tube(edge, radii, 5), GoldTrimMat, origin, default);
+            foreach (var end in new[] { edge[0], edge[edge.Length - 1] }) prim.Sphere(roof, GoldTrimMat, origin + end, 0.03f);
+
+            // gold crest (mon) with a red heart on the plaster, timber slats either side
+            var c = origin + new Vector3(0f, height * 0.4f, -0.012f);
+            float cr = Mathf.Min(0.065f, width * 0.11f);
+            prim.Cylinder(roof, GoldMat, c, cr, 0.026f, new Vector3(90f, 0f, 0f), false);
+            prim.Cylinder(roof, RedMat, c + new Vector3(0f, 0f, -0.006f), cr * 0.55f, 0.028f, new Vector3(90f, 0f, 0f), false);
+            foreach (var sx in new[] { -1f, 1f })
+                for (int k = 1; k <= 2; k++)
+                    prim.Box(roof, FrameMat, origin + new Vector3(sx * width * (0.12f + 0.1f * k), height * 0.16f, -0.012f), new Vector3(0.026f, height * 0.3f, 0.02f), default, false);
+        }
+
+        /// <summary>Stone stair from the lower slab up to the terrace, with cheek walls; built for the -Z face.</summary>
+        private void HallStairs(Transform t, float slabH, float deckY)
+        {
+            var stone = StoneMat;
+            var dark = StoneDarkMat;
+            prim.BoxOnGround(t, stone, new Vector3(0f, slabH, -1.32f), new Vector3(0.96f, 0.075f, 0.34f));
+            prim.BoxOnGround(t, stone, new Vector3(0f, slabH, -1.26f), new Vector3(0.96f, 0.15f, 0.22f));
+            foreach (var sx in new[] { -0.53f, 0.53f })
+            {
+                prim.BoxOnGround(t, dark, new Vector3(sx, slabH, -1.41f), new Vector3(0.1f, 0.12f, 0.16f));
+                prim.BoxOnGround(t, dark, new Vector3(sx, slabH, -1.24f), new Vector3(0.1f, deckY - slabH, 0.18f));
+                prim.Sphere(t, stone, new Vector3(sx, slabH + 0.13f, -1.47f), new Vector3(0.11f, 0.08f, 0.11f), false);
+            }
+        }
+
+        /// <summary>Ground floor of one face: shoji doors under a gold plaque, latticed windows, red pillars with bracket sets, rail, lanterns.</summary>
+        private void HallGroundFloorFace(Transform b, float y, float half, float wallH, Material pillar, float deckY)
+        {
+            var frame = FrameMat;
+            var gold = GoldMat;
+            float z0 = -half - 0.005f;
+            float top = y + wallH;
+
+            // entrance
+            prim.Box(b, ShojiMat, new Vector3(-0.15f, y + 0.31f, z0), new Vector3(0.28f, 0.6f, 0.04f));
+            prim.Box(b, ShojiMat, new Vector3(0.15f, y + 0.31f, z0), new Vector3(0.28f, 0.6f, 0.04f));
+            prim.Box(b, frame, new Vector3(0f, y + 0.63f, z0 - 0.015f), new Vector3(0.8f, 0.06f, 0.06f));
+            prim.Box(b, frame, new Vector3(0f, y + 0.31f, z0 - 0.012f), new Vector3(0.03f, 0.6f, 0.05f), default, false);
+            foreach (var sx in new[] { -0.38f, 0.38f }) prim.BoxOnGround(b, frame, new Vector3(sx, y, z0 - 0.015f), new Vector3(0.06f, 0.66f, 0.06f));
+            prim.Sphere(b, gold, new Vector3(0.05f, y + 0.31f, z0 - 0.04f), 0.028f);
+            prim.Sphere(b, gold, new Vector3(-0.05f, y + 0.31f, z0 - 0.04f), 0.028f);
+            prim.Box(b, gold, new Vector3(0f, y + 0.72f, z0 - 0.03f), new Vector3(0.34f, 0.085f, 0.03f), default, false);
+            prim.Box(b, frame, new Vector3(0f, y + 0.72f, z0 - 0.018f), new Vector3(0.38f, 0.115f, 0.02f), default, false);
+
+            // windows either side of the door, on a sill board
+            foreach (var sx in new[] { -0.6f, 0.6f })
+            {
+                Window(b, new Vector3(sx, y + 0.47f, z0), 0.26f, 0.36f, false);
+                prim.Box(b, frame, new Vector3(sx, y + 0.265f, z0 - 0.025f), new Vector3(0.36f, 0.04f, 0.07f), default, false);
+                foreach (var dx in new[] { -0.09f, 0.09f })
+                    prim.Box(b, frame, new Vector3(sx + dx, y + 0.47f, z0 - 0.012f), new Vector3(0.018f, 0.36f, 0.03f), default, false);
+            }
+
+            // pillar ring: base stone, gold band, capital and a bracket set carrying the eaves
+            const float pz = -1.04f;
+            float pillarTop = top + 0.05f;
+            foreach (var px in new[] { -1.04f, -0.52f, 0.52f })
+            {
+                prim.Cylinder(b, StoneDarkMat, new Vector3(px, deckY + 0.04f, pz), 0.085f, 0.07f);
+                prim.Cylinder(b, pillar, new Vector3(px, (deckY + pillarTop) * 0.5f + 0.03f, pz), 0.052f, pillarTop - deckY - 0.03f);
+                prim.Cylinder(b, GoldMat, new Vector3(px, deckY + 0.11f, pz), 0.06f, 0.022f);
+                prim.Cylinder(b, GoldMat, new Vector3(px, pillarTop - 0.14f, pz), 0.06f, 0.022f);
+                prim.Box(b, frame, new Vector3(px, pillarTop - 0.045f, pz), new Vector3(0.14f, 0.08f, 0.14f));
+                prim.Box(b, frame, new Vector3(px, pillarTop - 0.005f, pz), new Vector3(0.32f, 0.045f, 0.11f));
+                prim.Box(b, frame, new Vector3(px, pillarTop - 0.04f, pz - 0.1f), new Vector3(0.09f, 0.045f, 0.17f));
+                prim.Sphere(b, gold, new Vector3(px, pillarTop - 0.04f, pz - 0.19f), Vector3.one * 0.05f, false);
+            }
+            prim.Box(b, pillar, new Vector3(0f, top - 0.03f, pz), new Vector3(2.16f, 0.07f, 0.07f));
+            prim.Box(b, pillar, new Vector3(0f, y + 0.07f, pz), new Vector3(2.16f, 0.05f, 0.05f), default, false);
+
+            // low red rail (koran) either side of the stair, gold-capped posts
+            foreach (var cx in new[] { -0.83f, 0.83f })
+            {
+                prim.Box(b, pillar, new Vector3(cx, deckY + 0.26f, -1.11f), new Vector3(0.54f, 0.04f, 0.05f), default, false);
+                prim.Box(b, pillar, new Vector3(cx, deckY + 0.14f, -1.11f), new Vector3(0.54f, 0.03f, 0.04f), default, false);
+                for (int k = -2; k <= 2; k++) prim.BoxOnGround(b, pillar, new Vector3(cx + k * 0.115f, deckY, -1.11f), new Vector3(0.026f, 0.24f, 0.026f));
+                foreach (var e in new[] { -0.27f, 0.27f })
+                {
+                    prim.BoxOnGround(b, pillar, new Vector3(cx + e, deckY, -1.11f), new Vector3(0.05f, 0.27f, 0.05f));
+                    prim.Sphere(b, gold, new Vector3(cx + e, deckY + 0.3f, -1.11f), Vector3.one * 0.064f, false);
+                }
+            }
+
+            // hanging paper lanterns between the pillars
+            foreach (var lx in new[] { -0.78f, 0.78f }) PaperLantern(b, new Vector3(lx, top - 0.13f, pz - 0.02f), 0.85f);
+        }
+
+        /// <summary>Upper storey of one face: two latticed windows on sills, timber studs, gold fittings on the corner posts.</summary>
+        private void HallUpperFace(Transform b, float y, float half, float wallH, int storey, int level)
+        {
+            var frame = FrameMat;
+            float z0 = -half - 0.005f;
+            // the eave of the storey above hides the upper part of the wall from the fixed camera: the windows sit low
+            float wy = y + wallH * 0.36f;
+            float ww = Mathf.Max(0.16f, half * 0.34f);
+            float wh = wallH * 0.34f;
+            foreach (var sx in new[] { -1f, 1f })
+            {
+                float x = sx * half * 0.56f;
+                Window(b, new Vector3(x, wy, z0), ww, wh, false);
+                prim.Box(b, frame, new Vector3(x, wy - wh * 0.5f - 0.05f, z0 - 0.02f), new Vector3(ww + 0.1f, 0.035f, 0.065f), default, false);
+                prim.BoxOnGround(b, frame, new Vector3(sx * half * 0.24f, y + 0.03f, z0 - 0.005f), new Vector3(0.04f, wallH * 0.55f, 0.04f));
+                prim.Box(b, GoldMat, new Vector3(sx * half, y + wallH * 0.42f, z0 - 0.03f), new Vector3(0.075f, 0.1f, 0.02f), default, false);
+            }
+            if (storey == 1 && level >= 2) PaperLantern(b, new Vector3(half * 0.3f, y + wallH * 0.5f, -half - 0.13f), 0.7f);
+        }
 
         private GameObject TownHall(int level, int w, int d)
+        {
+            prim.ThinBoxes = true; // hundreds of bars and slats: flat boxes for everything hair-thin
+            try { return BuildTownHall(level); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        private GameObject BuildTownHall(int level)
         {
             int tiers = level + 1;
             var rng = Rng("town_hall");
@@ -264,150 +461,167 @@ namespace AgeOfSakura.Game
             var roof = Group(root, "Roof");
             var trees = Group(root, "Trees");
             var props = Group(root, "Props");
-            bool lacquered = level >= 3;
-            var pillar = lacquered ? RedMat : FrameMat;
+            bool gilded = level >= 3;
+            var pillar = RedMat; // lacquered pillars from the first look on, like the reference
+            var frame = FrameMat;
+            var gold = GoldMat;
+            var slateLight = SlateLightMat;
+            const float slabH = 0.08f, deckY = 0.3f;
+            var faces = new[] { 0f, 90f };
 
-            // stone terraces, the stairs with side rails, corner posts
-            prim.BoxOnGround(ground, StoneMat, Vector3.zero, new Vector3(2.95f, 0.2f, 2.95f));
-            prim.BoxOnGround(ground, StoneDarkMat, new Vector3(0f, 0.2f, 0f), new Vector3(2.55f, 0.1f, 2.55f));
-            prim.BoxOnGround(ground, StoneMat, new Vector3(0f, 0.2f, -1.34f), new Vector3(0.95f, 0.1f, 0.2f));
-            prim.BoxOnGround(ground, StoneMat, new Vector3(0f, 0.2f, -1.45f), new Vector3(1.0f, 0.05f, 0.18f));
-            foreach (var sx in new[] { -0.56f, 0.56f })
-            {
-                prim.BoxOnGround(ground, StoneDarkMat, new Vector3(sx, 0.2f, -1.36f), new Vector3(0.08f, 0.14f, 0.26f));
-                prim.Sphere(ground, StoneMat, new Vector3(sx, 0.36f, -1.46f), new Vector3(0.1f, 0.08f, 0.1f), false);
-            }
+            // ---- terrace: stone slab, raised platform with coping and a wooden veranda floor, corner stones, a stair on each visible face
+            prim.BoxOnGround(ground, StoneMat, Vector3.zero, new Vector3(2.96f, slabH, 2.96f));
+            prim.BoxOnGround(ground, StoneDarkMat, new Vector3(0f, slabH, 0f), new Vector3(2.3f, deckY - slabH, 2.3f));
+            prim.BoxOnGround(ground, StoneMat, new Vector3(0f, deckY - 0.03f, 0f), new Vector3(2.36f, 0.05f, 2.36f));
+            prim.BoxOnGround(ground, WoodMat, new Vector3(0f, deckY + 0.015f, 0f), new Vector3(2.2f, 0.02f, 2.2f));
             foreach (var sx in new[] { -1f, 1f })
                 foreach (var sz in new[] { -1f, 1f })
-                    prim.BoxOnGround(ground, StoneDarkMat, new Vector3(sx * 1.42f, 0.2f, sz * 1.42f), new Vector3(0.12f, 0.12f, 0.12f));
-            StoneLine(ground, new Vector3(-1.45f, 0.1f, -1.46f), new Vector3(1.45f, 0.1f, -1.46f), 14, 0.11f, rng, StoneMat);
-            StoneLine(ground, new Vector3(-1.46f, 0.1f, -1.4f), new Vector3(-1.46f, 0.1f, 1.4f), 14, 0.11f, rng, StoneMat);
+                    prim.BoxOnGround(ground, StoneDarkMat, new Vector3(sx * 1.42f, slabH, sz * 1.42f), new Vector3(0.14f, 0.13f, 0.14f));
+            foreach (var yaw in faces)
+            {
+                var g = Pivot(ground, yaw);
+                HallStairs(g, slabH, deckY);
+            }
 
-            // tiers: each one smaller, with a pagoda-like roof
-            float y = 0.3f;
-            float half = 1.05f;
-            float topY = y;
+            // ---- storeys: plaster box in a timber frame, ring of red pillars around the first, sagging tile roof on each
+            float y = deckY + 0.01f;
+            float half = 0.84f;
+            float ridgeY = y;
+            ProceduralMeshes.PagodaRoofSpec lastSpec = default;
             for (int i = 0; i < tiers; i++)
             {
+                bool top = i == tiers - 1;
+                float wallH = i == 0 ? 0.86f : 0.66f - 0.06f * (i - 1);
+                float nextHalf = half * 0.72f;
+                float eave = half + (i == 0 ? 0.52f : 0.29f * Mathf.Pow(0.9f, i - 1));
+                float roofH = i == 0 ? 0.5f : (top ? 0.5f : 0.38f);
+                float topW = top ? Mathf.Max(0.16f, eave * 0.36f) : nextHalf + 0.04f;
+                float topD = top ? 0.03f : nextHalf + 0.04f;
+                float roofY = y + wallH - 0.02f;
+                var spec = new ProceduralMeshes.PagodaRoofSpec(eave, eave, topW, topD, roofH, 0.13f * Mathf.Pow(0.85f, i));
+
+                // walls, framing, beams
                 float size = half * 2f;
-                float wallH = (i == 0 ? 0.78f : 0.6f) - 0.03f * i;
-                prim.BoxOnGround(body, PlasterMat, new Vector3(0f, y, 0f), new Vector3(size, wallH, size));
-                prim.BoxOnGround(body, pillar, new Vector3(0f, y, 0f), new Vector3(size + 0.08f, 0.07f, size + 0.08f));
-                prim.BoxOnGround(body, pillar, new Vector3(0f, y + wallH - 0.05f, 0f), new Vector3(size + 0.1f, 0.09f, size + 0.1f));
-                // a second, thinner beam mid-wall like the half-timber cottages
-                prim.BoxOnGround(body, pillar, new Vector3(0f, y + wallH * 0.52f, 0f), new Vector3(size + 0.05f, 0.04f, size + 0.05f));
+                prim.BoxOnGround(body, PlasterMat, new Vector3(0f, y, 0f), new Vector3(size - 0.02f, wallH, size - 0.02f));
+                prim.BoxOnGround(body, frame, new Vector3(0f, y, 0f), new Vector3(size + 0.08f, 0.07f, size + 0.08f));
+                var beam = i == 0 || gilded ? pillar : frame;
+                prim.BoxOnGround(body, beam, new Vector3(0f, y + wallH - 0.1f, 0f), new Vector3(size + 0.1f, 0.09f, size + 0.1f));
                 foreach (var sx in new[] { -1f, 1f })
-                {
                     foreach (var sz in new[] { -1f, 1f })
                     {
-                        prim.BoxOnGround(body, pillar, new Vector3(sx * half, y, sz * half), new Vector3(0.13f, wallH + 0.02f, 0.13f));
-                        prim.BoxOnGround(body, StoneDarkMat, new Vector3(sx * half, y, sz * half), new Vector3(0.18f, 0.06f, 0.18f)); // pillar base stone
+                        prim.BoxOnGround(body, frame, new Vector3(sx * half, y, sz * half), new Vector3(0.12f, wallH + 0.01f, 0.12f));
+                        prim.BoxOnGround(body, StoneDarkMat, new Vector3(sx * half, y, sz * half), new Vector3(0.17f, 0.05f, 0.17f));
                     }
-                    if (i == 0)
-                    {
-                        foreach (var z in new[] { -half, half })
-                            prim.BoxOnGround(body, FrameMat, new Vector3(sx * half * 0.4f, y, z), new Vector3(0.08f, wallH, 0.06f));
-                        prim.BoxOnGround(body, FrameMat, new Vector3(sx * half, y, 0f), new Vector3(0.06f, wallH, 0.09f));
-                    }
-                }
 
-                // tokyo-style brackets under the eaves: stacked blocks carrying the roof on the two faces the camera sees
-                foreach (var t in new[] { -0.55f, 0f, 0.55f })
+                foreach (var yaw in faces)
                 {
-                    float off = t * half;
-                    prim.Box(body, pillar, new Vector3(off, y + wallH - 0.1f, -half - 0.07f), new Vector3(0.11f, 0.07f, 0.1f), default, false);
-                    prim.Box(body, pillar, new Vector3(off, y + wallH - 0.03f, -half - 0.12f), new Vector3(0.15f, 0.05f, 0.12f), default, false);
-                    prim.Box(body, pillar, new Vector3(-half - 0.07f, y + wallH - 0.1f, off), new Vector3(0.1f, 0.07f, 0.11f), default, false);
-                    prim.Box(body, pillar, new Vector3(-half - 0.12f, y + wallH - 0.03f, off), new Vector3(0.12f, 0.05f, 0.15f), default, false);
+                    var b = Pivot(body, yaw);
+                    if (i == 0) HallGroundFloorFace(b, y, half, wallH, pillar, deckY);
+                    else HallUpperFace(b, y, half, wallH, i, level);
                 }
-
-                // windows on the two faces the camera sees (front -Z, left -X)
-                float winY = y + wallH * 0.5f;
                 if (i == 0)
                 {
-                    // entrance: recessed shoji doors in a dark frame under a small gabled canopy with a gold plaque
-                    prim.Box(body, ShojiMat, new Vector3(-0.15f, y + 0.27f, -half - 0.005f), new Vector3(0.28f, 0.52f, 0.04f));
-                    prim.Box(body, ShojiMat, new Vector3(0.15f, y + 0.27f, -half - 0.005f), new Vector3(0.28f, 0.52f, 0.04f));
-                    prim.Box(body, FrameMat, new Vector3(0f, y + 0.55f, -half - 0.02f), new Vector3(0.74f, 0.06f, 0.06f));
-                    foreach (var sx in new[] { -0.37f, 0.37f }) prim.BoxOnGround(body, FrameMat, new Vector3(sx, y, -half - 0.02f), new Vector3(0.06f, 0.56f, 0.06f));
-                    prim.Sphere(body, GoldMat, new Vector3(0.04f, y + 0.27f, -half - 0.04f), 0.03f);
-                    prim.Sphere(body, GoldMat, new Vector3(-0.04f, y + 0.27f, -half - 0.04f), 0.03f);
-                    prim.Box(body, GoldMat, new Vector3(0f, y + 0.66f, -half - 0.03f), new Vector3(0.32f, 0.09f, 0.03f), default, false);
-                    prim.Box(body, FrameMat, new Vector3(0f, y + 0.66f, -half - 0.018f), new Vector3(0.36f, 0.12f, 0.02f), default, false);
-                    foreach (var sx in new[] { -0.72f, 0.72f }) Window(body, new Vector3(sx, winY, -half - 0.005f), 0.3f, 0.26f, false);
-                    foreach (var z in new[] { -0.55f, 0.15f, 0.7f }) Window(body, new Vector3(-half - 0.005f, winY, z), 0.3f, 0.26f, true);
-                    PaperLantern(body, new Vector3(-0.5f, y + wallH - 0.2f, -half - 0.18f), 0.85f);
-                    PaperLantern(body, new Vector3(0.5f, y + wallH - 0.2f, -half - 0.18f), 0.85f);
-                }
-                else
-                {
-                    Window(body, new Vector3(0f, winY, -half - 0.005f), 0.28f, 0.22f, false);
-                    Window(body, new Vector3(-half - 0.005f, winY, 0f), 0.28f, 0.22f, true);
-                    if (i == 1 && level >= 2) PaperLantern(body, new Vector3(half * 0.55f, y + wallH - 0.17f, -half - 0.16f), 0.7f);
-                }
-
-                if (lacquered && i > 0)
-                {
-                    // balcony rail in red
-                    float railY = y + 0.02f;
-                    float rail = half + 0.2f;
-                    foreach (var s in new[] { -1f, 1f })
+                    // the two far corner pillars close the ring under the eaves
+                    foreach (var p in new[] { new Vector2(1.04f, -1.04f), new Vector2(1.04f, 1.04f) })
                     {
-                        prim.Box(body, RedMat, new Vector3(0f, railY + 0.17f, s * rail), new Vector3(rail * 2f, 0.04f, 0.04f), default, false);
-                        prim.Box(body, RedMat, new Vector3(s * rail, railY + 0.17f, 0f), new Vector3(0.04f, 0.04f, rail * 2f), default, false);
-                        for (int k = -2; k <= 2; k++)
-                        {
-                            prim.BoxOnGround(body, RedMat, new Vector3(k * rail * 0.5f, railY, s * rail), new Vector3(0.035f, 0.17f, 0.035f));
-                            prim.BoxOnGround(body, RedMat, new Vector3(s * rail, railY, k * rail * 0.5f), new Vector3(0.035f, 0.17f, 0.035f));
-                        }
+                        float pillarTop = y + wallH + 0.05f;
+                        prim.Cylinder(body, pillar, new Vector3(p.x, (deckY + pillarTop) * 0.5f + 0.03f, p.y), 0.052f, pillarTop - deckY - 0.03f);
+                        prim.Box(body, frame, new Vector3(p.x, pillarTop - 0.045f, p.y), new Vector3(0.14f, 0.08f, 0.14f));
                     }
                 }
 
-                // roof of this tier (kept inside the footprint: neighbours never meet it)
-                float roofSize = size * 1.3f + 0.04f;
-                float roofH = 0.5f + 0.04f * (tiers - i);
-                float roofY = y + wallH;
-                prim.MeshObject(roof, ProceduralMeshes.HipRoof(roofSize, roofSize, roofH, 0.5f, 0.09f), SlateMat, new Vector3(0f, roofY, 0f));
-                // tile edge band and a ridge-line of lighter tiles along each hip
-                float edge = roofSize * 0.5f + 0.1f;
-                foreach (var s in new[] { -1f, 1f })
+                // roof: shell, hip ridges in light tile, gold edge line and corner tips
+                prim.MeshObject(roof, ProceduralMeshes.PagodaRoof(spec), SlateUvMat, new Vector3(0f, roofY, 0f));
+                for (int c = 0; c < 4; c++)
                 {
-                    prim.Box(roof, SlateLightMat, new Vector3(0f, roofY + 0.085f, s * edge), new Vector3(roofSize + 0.2f, 0.05f, 0.05f), default, false);
-                    prim.Box(roof, SlateLightMat, new Vector3(s * edge, roofY + 0.085f, 0f), new Vector3(0.05f, 0.05f, roofSize + 0.2f), default, false);
+                    const int steps = 8;
+                    var path = new Vector3[steps];
+                    var radii = new float[steps];
+                    for (int k = 0; k < steps; k++)
+                    {
+                        float t = 0.02f + 0.96f * k / (steps - 1);
+                        path[k] = spec.Hip(t, c) + new Vector3(0f, 0.022f, 0f);
+                        radii[k] = Mathf.Lerp(0.032f, 0.022f, t);
+                    }
+                    prim.MeshObject(roof, ProceduralMeshes.Tube(path, radii, 5), slateLight, new Vector3(0f, roofY, 0f));
+                    var tip = spec.Hip(PagodaTip, c);
+                    var outward = new Vector3(Mathf.Sign(tip.x), 0f, Mathf.Sign(tip.z)).normalized;
+                    var cone = prim.Cone(roof, gold, new Vector3(0f, roofY, 0f) + tip + new Vector3(0f, 0.01f, 0f), 0.035f, 0.13f);
+                    cone.transform.localRotation = Quaternion.FromToRotation(Vector3.up, (outward * 0.8f + Vector3.up * 0.6f).normalized);
                 }
-                foreach (var sx in new[] { -1f, 1f })
-                    foreach (var sz in new[] { -1f, 1f })
-                        prim.Cone(roof, GoldMat, new Vector3(sx * roofSize * 0.5f, roofY + 0.02f, sz * roofSize * 0.5f), 0.04f, 0.13f);
+                {
+                    int n = 4 * ProceduralMeshes.PagodaRoofSpec.Segments;
+                    var edge = new Vector3[n + 1];
+                    var radii = new float[n + 1];
+                    for (int p = 0; p <= n; p++)
+                    {
+                        edge[p] = spec.Point(ProceduralMeshes.PagodaRoofSpec.LipT, p % n) + new Vector3(0f, 0.03f, 0f);
+                        radii[p] = 0.019f;
+                    }
+                    prim.MeshObject(roof, ProceduralMeshes.Tube(edge, radii, 4), GoldTrimMat, new Vector3(0f, roofY, 0f));
+                }
 
-                topY = roofY + roofH;
-                y = roofY + roofH * 0.36f; // the next tier starts inside this roof
-                half *= 0.7f;
+                // karahafu gable in front of the roof on both visible faces
+                float k0 = eave / 1.36f;
+                float td = top ? 0.42f : 0.36f;
+                float hz = Mathf.Lerp(spec.EaveD, spec.TopD, td);
+                float run = hz - (top ? 0.06f : nextHalf - 0.02f);
+                float rise = spec.SlopeD(td) * run;
+                foreach (var yaw in faces)
+                {
+                    var r = Pivot(roof, yaw);
+                    HallGable(r, new Vector3(0f, roofY + spec.Profile(td) - 0.02f, -hz), Mathf.Max(0.5f, 0.92f * k0), Mathf.Max(0.22f, 0.36f * k0), run, rise);
+                }
+
+                lastSpec = spec;
+                ridgeY = roofY + roofH;
+                y = roofY + roofH - 0.03f;
+                half = nextHalf;
             }
-            prim.Cone(roof, GoldMat, new Vector3(0f, topY - 0.02f, 0f), 0.06f, 0.36f);
-            prim.Sphere(roof, GoldMat, new Vector3(0f, topY + 0.3f, 0f), 0.05f);
-            prim.Cylinder(roof, GoldMat, new Vector3(0f, topY + 0.1f, 0f), 0.05f, 0.03f);
-            prim.Cylinder(roof, GoldMat, new Vector3(0f, topY + 0.18f, 0f), 0.04f, 0.03f);
+
+            // ridge of the top roof: light tile cap, golden shachihoko on both ends, finial in the middle
+            {
+                float tw = lastSpec.TopW;
+                var ridge = new[] { new Vector3(-tw, 0.02f, 0f), new Vector3(-tw * 0.5f, 0.03f, 0f), new Vector3(0f, 0.035f, 0f), new Vector3(tw * 0.5f, 0.03f, 0f), new Vector3(tw, 0.02f, 0f) };
+                var radii = new[] { 0.04f, 0.04f, 0.04f, 0.04f, 0.04f };
+                prim.MeshObject(roof, ProceduralMeshes.Tube(ridge, radii, 5), slateLight, new Vector3(0f, ridgeY, 0f));
+                float s = tiers >= 4 ? 1.1f : 1f;
+                Shachihoko(roof, new Vector3(tw, ridgeY + 0.02f, 0f), 1f, s);
+                Shachihoko(roof, new Vector3(-tw, ridgeY + 0.02f, 0f), -1f, s);
+                Finial(roof, new Vector3(0f, ridgeY + 0.03f, 0f), 1f);
+            }
+            float topY = ridgeY + 0.5f;
             var model = root.GetComponent<BuildingModel>();
             model.IndicatorHeight = topY + 0.7f;
             model.ColliderHeight = topY;
 
-            // banners flanking the entrance, stone lanterns
+            // ---- props: nobori banners flanking the stair, stone lanterns on both faces
             foreach (var sx in new[] { -1f, 1f })
             {
-                float x = sx * 1.32f;
-                prim.Cylinder(props, FrameMat, new Vector3(x, 0.22f + 0.72f, -1.38f), 0.03f, 1.44f);
-                prim.Sphere(props, GoldMat, new Vector3(x, 0.22f + 1.46f, -1.38f), 0.05f);
-                prim.Box(props, art.Lit(Palette.BannerRed), new Vector3(x - sx * 0.14f, 0.22f + 1.04f, -1.38f), new Vector3(0.24f, 0.62f, 0.025f), default, false);
-                prim.Box(props, GoldMat, new Vector3(x - sx * 0.14f, 0.22f + 1.32f, -1.38f), new Vector3(0.24f, 0.05f, 0.03f), default, false);
-                prim.Box(props, GoldMat, new Vector3(x - sx * 0.14f, 0.22f + 0.78f, -1.38f), new Vector3(0.24f, 0.03f, 0.03f), default, false);
+                float x = sx * 1.02f;
+                const float bz = -1.44f;
+                prim.Cylinder(props, frame, new Vector3(x, slabH + 0.74f, bz), 0.028f, 1.48f);
+                prim.Sphere(props, gold, new Vector3(x, slabH + 1.5f, bz), 0.05f);
+                prim.Box(props, frame, new Vector3(x - sx * 0.14f, slabH + 1.4f, bz), new Vector3(0.3f, 0.028f, 0.028f), default, false);
+                prim.Box(props, RedMat, new Vector3(x - sx * 0.14f, slabH + 1.0f, bz), new Vector3(0.24f, 0.78f, 0.022f), default, false);
+                prim.Box(props, gold, new Vector3(x - sx * 0.14f, slabH + 1.36f, bz - 0.005f), new Vector3(0.26f, 0.04f, 0.026f), default, false);
+                prim.Box(props, gold, new Vector3(x - sx * 0.14f, slabH + 0.63f, bz - 0.005f), new Vector3(0.26f, 0.03f, 0.026f), default, false);
+                prim.Cylinder(props, gold, new Vector3(x - sx * 0.14f, slabH + 1.03f, bz - 0.015f), 0.06f, 0.02f, new Vector3(90f, 0f, 0f), false);
+                prim.Cylinder(props, RedMat, new Vector3(x - sx * 0.14f, slabH + 1.03f, bz - 0.02f), 0.032f, 0.02f, new Vector3(90f, 0f, 0f), false);
             }
-            foreach (var sx in new[] { -0.95f, 0.95f }) StoneLantern(props, new Vector3(sx, 0.3f, -1.3f), 0.85f);
+            foreach (var yaw in faces)
+            {
+                var lanterns = Pivot(props, yaw);
+                foreach (var sx in new[] { -0.8f, 0.8f }) StoneLantern(lanterns, new Vector3(sx, slabH, -1.3f), 0.8f);
+            }
 
-            // blossom bushes on the terrace corners: low enough to sit under the eaves, clear of the pillars (no tree can stand in a 3x3 footprint
-            // without growing through the roofs, so the sakura trees of the world stand outside, in their own cells)
-            foreach (var p in new[] { new Vector2(-1.36f, 1.3f), new Vector2(1.36f, 1.3f), new Vector2(-1.38f, 0.3f), new Vector2(1.38f, 0.3f) })
-                BlossomBush(trees, new Vector3(p.x, 0.3f, p.y), 0.8f, rng);
-            Bush(trees, new Vector3(0f, 0.3f, 1.4f), 0.75f, rng);
+            // ---- shrubs and blossom bushes on the terrace corners: low enough to sit under the eaves, clear of the pillars (no tree can stand in
+            // a 3x3 footprint without growing through the roofs, so the sakura trees of the world stand outside, in their own cells)
+            Bush(trees, new Vector3(-1.34f, slabH, -1.34f), 0.8f, rng);
+            BlossomBush(trees, new Vector3(1.34f, slabH, -1.34f), 0.75f, rng);
+            BlossomBush(trees, new Vector3(-1.34f, slabH, 1.26f), 0.8f, rng);
+            BlossomBush(trees, new Vector3(1.36f, slabH, 1.3f), 0.8f, rng);
+            Bush(trees, new Vector3(0f, slabH, 1.4f), 0.75f, rng);
             return root;
         }
 

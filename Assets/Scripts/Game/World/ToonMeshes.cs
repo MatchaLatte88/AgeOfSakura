@@ -175,6 +175,48 @@ namespace AgeOfSakura.Game
             }
         }
 
+        // ------------------------------------------------------------------ flat box for hair-thin parts
+
+        /// <summary>
+        /// Plain box (24 vertices, 12 triangles, flat faces) for parts so thin that a bevel would be invisible: window bars, rails, slats.
+        /// Outline-ready like every other mesh (<see cref="Finish"/> bakes the smoothed hull direction).
+        /// </summary>
+        public static Mesh SharpBox(Vector3 size)
+        {
+            int kx = Mathf.Max(1, Mathf.RoundToInt(size.x * 1000f));
+            int ky = Mathf.Max(1, Mathf.RoundToInt(size.y * 1000f));
+            int kz = Mathf.Max(1, Mathf.RoundToInt(size.z * 1000f));
+            long key = Key(7, kx, ky, kz);
+            if (Cache.TryGetValue(key, out var cached)) return cached;
+
+            var half = new Vector3(kx, ky, kz) * 0.0005f;
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var tris = new List<int>();
+            for (int axis = 0; axis < 3; axis++)
+                for (int sign = -1; sign <= 1; sign += 2)
+                {
+                    int u = (axis + 1) % 3, v = (axis + 2) % 3;
+                    var n = Vector3.zero; n[axis] = sign;
+                    int start = verts.Count;
+                    foreach (var (a, b) in new[] { (-1, -1), (1, -1), (1, 1), (-1, 1) })
+                    {
+                        var p = Vector3.zero;
+                        p[axis] = sign * half[axis]; p[u] = a * half[u]; p[v] = b * half[v];
+                        verts.Add(p);
+                        normals.Add(n);
+                    }
+                    AddOutwardQuad(verts, normals, tris, start, start + 1, start + 2, start + 3);
+                }
+            var mesh = new Mesh { name = $"SharpBox_{kx}x{ky}x{kz}" };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetTriangles(tris, 0);
+            Finish(mesh);
+            Cache[key] = mesh;
+            return mesh;
+        }
+
         // ------------------------------------------------------------------ rounded cylinder
 
         /// <summary>Upright cylinder of exactly the given radius and height, centred on the origin, with rounded rims.</summary>
@@ -341,7 +383,8 @@ namespace AgeOfSakura.Game
                 if (bumpiness > 0f)
                 {
                     bump = Mathf.Sin(d.x * 3.1f + phase.x) * Mathf.Sin(d.y * 2.7f + phase.y) * 0.6f
-                           + Mathf.Sin(d.z * 4.3f + phase.z + d.x * 1.7f) * 0.4f;
+                           + Mathf.Sin(d.z * 4.3f + phase.z + d.x * 1.7f) * 0.4f
+                           + Mathf.Sin(d.x * 7.7f + phase.z) * Mathf.Sin(d.z * 6.9f + phase.x) * Mathf.Sin(d.y * 5.3f + phase.y) * 0.55f; // small lumps: leaf clusters
                 }
                 verts[i] = d * (0.5f * (1f + bump * bumpiness));
             }
@@ -362,6 +405,12 @@ namespace AgeOfSakura.Game
                     float lambert = Mathf.Clamp01(Vector3.Dot(n, sun) * 0.5f + 0.5f);
                     float sky = Mathf.Clamp01(n.y * 0.5f + 0.5f);
                     float t = Mathf.Clamp01(lambert * 0.65f + sky * 0.35f);
+                    // leaf clusters: patchy light and dark instead of one smooth gradient, and a little occlusion on the underside
+                    var dir = verts[i].normalized;
+                    float mottle = Mathf.Sin(dir.x * 9.1f + phase.y) * Mathf.Sin(dir.y * 8.3f + phase.z)
+                                   + Mathf.Sin(dir.z * 10.7f + phase.x + dir.x * 3f) * 0.6f;
+                    t += mottle * 0.075f - Mathf.Clamp01(-n.y) * 0.14f;
+                    t = Mathf.Lerp(0.52f, t, 0.8f);                                   // softer than a lone ball: neighbours already shade each other
                     t = Mathf.Clamp01((t - 0.18f) / 0.72f);
                     colors[i] = ToonStyle.ToVertexColor(FoliageColor(palette, t));
                 }
@@ -467,18 +516,105 @@ namespace AgeOfSakura.Game
 
         private static Color Dark(Color c, float f) => new Color(c.r * f, c.g * f, c.b * f, 1f);
 
+        // ------------------------------------------------------------------ spruce tiers
+
+        /// <summary>
+        /// One tier of a spruce: a skirt of drooping branch tips (<paramref name="lobes"/> of them, each a little different), thick towards
+        /// the trunk and hanging lower at the tips, with a dark underside. Closed, smooth, vertex colours baked along the spruce ramp
+        /// (light on the upper side and the tips, dark inside and underneath). Base at y = 0, tip at y = height.
+        /// </summary>
+        public static Mesh SpruceTier(float radius, float height, int lobes, int segments, int seed)
+        {
+            long key = Key(8, Mathf.RoundToInt(radius * 100f) * 1000 + Mathf.RoundToInt(height * 100f), lobes * 1000 + segments, seed);
+            if (BlobCache.TryGetValue(key, out var cached)) return cached;
+
+            var rng = new System.Random(seed * 977 + 31);
+            float phase = (float)rng.NextDouble() * 6.283f;
+            var amp = new float[segments];
+            for (int s = 0; s < segments; s++) amp[s] = 0.7f + (float)rng.NextDouble() * 0.6f;
+
+            // (radius factor, y factor, droop factor) from the top ring down to the underside rim
+            var rings = new[] { new Vector3(0.3f, 0.7f, 0f), new Vector3(0.68f, 0.34f, 0.35f), new Vector3(1f, 0.1f, 1f), new Vector3(0.7f, -0.02f, 0.5f) };
+            var verts = new List<Vector3> { new Vector3(0f, height, 0f) };
+            var ringFactor = new List<float> { 0f };
+            foreach (var r in rings)
+            {
+                for (int s = 0; s < segments; s++)
+                {
+                    float theta = s / (float)segments * Mathf.PI * 2f;
+                    float petal = Mathf.Pow(Mathf.Cos(lobes * theta + phase) * 0.5f + 0.5f, 1.5f) * amp[s];
+                    float rad = radius * r.x * (1f + 0.24f * petal * r.x);
+                    float y = height * r.y - height * 0.11f * petal * r.z;
+                    verts.Add(new Vector3(Mathf.Cos(theta) * rad, y, Mathf.Sin(theta) * rad));
+                    ringFactor.Add(r.x);
+                }
+            }
+            verts.Add(new Vector3(0f, height * 0.06f, 0f));
+            ringFactor.Add(0f);
+            int center = verts.Count - 1;
+            var tris = new List<int>();
+            for (int s = 0; s < segments; s++)
+            {
+                int n = (s + 1) % segments;
+                tris.Add(0); tris.Add(1 + s); tris.Add(1 + n);
+                for (int r = 0; r + 1 < rings.Length; r++)
+                {
+                    int a = 1 + r * segments, b = 1 + (r + 1) * segments;
+                    tris.Add(a + s); tris.Add(b + s); tris.Add(b + n);
+                    tris.Add(a + s); tris.Add(b + n); tris.Add(a + n);
+                }
+                int d = 1 + (rings.Length - 1) * segments;
+                tris.Add(d + s); tris.Add(center); tris.Add(d + n);
+            }
+
+            // the winding above is consistent for every ring; flip everything if the mesh came out inside-out
+            float volume = 0f;
+            for (int i = 0; i < tris.Count; i += 3) volume += Vector3.Dot(verts[tris[i]], Vector3.Cross(verts[tris[i + 1]], verts[tris[i + 2]]));
+            if (volume < 0f)
+                for (int i = 0; i < tris.Count; i += 3) { int tmp = tris[i + 1]; tris[i + 1] = tris[i + 2]; tris[i + 2] = tmp; }
+
+            var mesh = new Mesh { name = "SpruceTier_" + seed };
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+
+            var normals = mesh.normals;
+            var colors = new Color32[verts.Count];
+            var sun = ToonStyle.SunDirTowardsSun;
+            for (int i = 0; i < colors.Length; i++)
+            {
+                var n = normals[i];
+                float lambert = Mathf.Clamp01(Vector3.Dot(n, sun) * 0.5f + 0.5f);
+                float sky = Mathf.Clamp01(n.y * 0.5f + 0.5f);
+                float t = lambert * 0.6f + sky * 0.4f;
+                t += (ringFactor[i] - 0.55f) * 0.16f;                          // tips lighter, the inside (near the trunk) darker
+                t -= Mathf.Clamp01(-n.y) * 0.2f;                                // underside in shadow
+                t += Mathf.Sin(verts[i].x * 23f + phase) * Mathf.Sin(verts[i].z * 19f) * 0.05f;
+                t = Mathf.Clamp01((t - 0.18f) / 0.72f);
+                colors[i] = ToonStyle.ToVertexColor(FoliageColor(FoliagePalette.Spruce, t));
+            }
+            mesh.colors32 = colors;
+            Finish(mesh);
+            BlobCache[key] = mesh;
+            return mesh;
+        }
+
         // ------------------------------------------------------------------ flat helpers
 
         /// <summary>Unit quad in the XY plane facing -Z (towards a camera that looks along +Z), uv 0..1, for leaf cards.</summary>
-        public static Mesh Card()
+        public static Mesh Card(int variant = 0)
         {
-            long key = Key(6, 0, 0, 0);
+            variant = Mathf.Clamp(variant, 0, 2);
+            long key = Key(6, variant, 0, 0);
             if (Cache.TryGetValue(key, out var cached)) return cached;
-            var mesh = new Mesh { name = "LeafCard" };
+            var mesh = new Mesh { name = "LeafCard" + variant };
             mesh.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(0.5f, -0.5f, 0f) };
             mesh.uv = new[] { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) };
             mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
             mesh.normals = new[] { Vector3.back, Vector3.back, Vector3.back, Vector3.back };
+            // three brightness variants (the vertex colour multiplies the tint) so a crown full of cards is not one flat tone
+            byte g = (byte)(variant == 0 ? 255 : (variant == 1 ? 228 : 200));
+            mesh.colors32 = new[] { new Color32(g, g, g, 255), new Color32(g, g, g, 255), new Color32(g, g, g, 255), new Color32(g, g, g, 255) };
             Finish(mesh);
             Cache[key] = mesh;
             return mesh;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace AgeOfSakura.Game
@@ -84,31 +85,90 @@ namespace AgeOfSakura.Game
             return crown;
         }
 
-        private GameObject Clump(Transform crown, FoliagePalette palette, Vector3 pos, Vector3 size, System.Random rng, bool outline = true)
+        /// <summary>Group for the static woody parts of a tree (trunk, limbs, roots, moss, ground disc): merged into a few meshes at the end.</summary>
+        private static Transform NewGroup(GameObject tree, string name)
         {
-            int seed = rng.Next(6);
-            int sub = Near ? ToonStyle.FoliageSubdivisionsNear : ToonStyle.FoliageSubdivisionsFar;
-            float hue = R(rng, 0.94f, 1f);
-            var tint = new Color(hue, 1f, hue + (1f - hue) * 0.5f, 1f);
-            return prim.Add(crown, ToonMeshes.Blob(sub, seed, 0.3f, palette), art.Foliage(tint, outline), pos, size, default, "Clump");
+            var g = new GameObject(name).transform;
+            g.SetParent(tree.transform, false);
+            return g;
         }
 
-        /// <summary>Leaf cards scattered over an ellipsoid, all facing the fixed camera; their tint follows the same light ramp as the clumps.</summary>
-        private void LeafCards(Transform crown, FoliagePalette palette, Vector3 center, Vector3 radii, int count, float cardSize, System.Random rng)
+        /// <summary>Centre and diameter of a crown clump: the leaf cards sit on the surfaces of these.</summary>
+        private struct Spot
         {
-            if (!Near) return;
-            var sun = ToonStyle.SunDirTowardsSun;
+            public Vector3 Pos;
+            public float Size;
+        }
+
+        /// <summary>
+        /// One crown clump. Big clumps near the camera get the finer icosphere; every clump gets a slight brightness/hue variation
+        /// (in a few steps, so the materials stay shared) and a shade that follows its height in the crown.
+        /// </summary>
+        private GameObject Clump(Transform crown, FoliagePalette palette, Vector3 pos, Vector3 size, System.Random rng, float shade = 1f, bool outline = true)
+        {
+            int seed = rng.Next(6);
+            int sub = Near && Mathf.Max(size.x, size.z) >= 0.36f ? ToonStyle.FoliageSubdivisionsNear : ToonStyle.FoliageSubdivisionsFar;
+            float hue = 0.94f + rng.Next(3) * 0.03f;
+            float v = Mathf.Round(shade * R(rng, 0.95f, 1.04f) * 16f) / 16f;
+            var tint = new Color(v * hue, v, v * (hue + (1f - hue) * 0.5f), 1f);
+            return prim.Add(crown, ToonMeshes.Blob(sub, seed, sub >= 2 ? 0.34f : 0.22f, palette), art.Foliage(tint, outline), pos, size, default, "Clump");
+        }
+
+        /// <summary>
+        /// A crown made of many clumps: one big dark core that fills the volume, then clumps spiralling over an ellipsoid shell from the lower
+        /// skirt to the top (big and dark low, small and bright high), so the crown is lumpy and layered instead of five smooth balls.
+        /// </summary>
+        private List<Spot> Crown(Transform crown, FoliagePalette palette, Vector3 center, Vector3 radii, int count, float sizeMax, float sizeMin, System.Random rng, bool core = true)
+        {
+            var spots = new List<Spot>(count + 1);
+            if (core)
+            {
+                var size = new Vector3(radii.x * 1.5f, radii.y * 1.25f, radii.z * 1.5f);
+                Clump(crown, palette, center, size, rng, 0.96f);
+                spots.Add(new Spot { Pos = center, Size = Mathf.Max(size.x, size.z) });
+            }
             for (int i = 0; i < count; i++)
             {
-                var dir = new Vector3(R(rng, -1f, 1f), R(rng, -0.25f, 1f), R(rng, -1f, 1f));
+                float t = (i + 0.5f) / count;
+                float yy = Mathf.Lerp(-0.6f, 0.92f, t);
+                float ring = Mathf.Sqrt(Mathf.Max(0.05f, 1f - yy * yy));
+                float ang = i * 2.39996f + R(rng, -0.35f, 0.35f);
+                var pos = center + new Vector3(Mathf.Cos(ang) * ring * radii.x, yy * radii.y, Mathf.Sin(ang) * ring * radii.z);
+                float size = Mathf.Lerp(sizeMax, sizeMin, Mathf.Abs(yy)) * R(rng, 0.85f, 1.15f);
+                float shade = Mathf.Lerp(0.84f, 1.08f, (yy + 0.6f) / 1.52f) * R(rng, 0.96f, 1.03f);
+                Clump(crown, palette, pos, new Vector3(size, size * R(rng, 0.78f, 0.95f), size), rng, shade);
+                spots.Add(new Spot { Pos = pos, Size = size });
+            }
+            return spots;
+        }
+
+        /// <summary>
+        /// Leaf (or blossom) cards scattered over the outer surfaces of the crown clumps, all facing the fixed camera. They break up the smooth
+        /// silhouette into leafy edges; their tint follows the same light ramp as the clumps, in a few steps, and each card comes in one of three
+        /// brightness variants. Far scenery (no sway, static batching) gets half of them.
+        /// </summary>
+        private void Cards(Transform crown, FoliagePalette palette, List<Spot> spots, Vector3 center, int count, float cardSize, PaintedTexture texture, System.Random rng, float protrude = 1.22f)
+        {
+            if (spots.Count == 0) return;
+            int n = Near ? count : count * 2 / 3;
+            var sun = ToonStyle.SunDirTowardsSun;
+            for (int i = 0; i < n; i++)
+            {
+                var spot = spots[rng.Next(spots.Count)];
+                var dir = new Vector3(R(rng, -1f, 1f), R(rng, -0.3f, 1f), R(rng, -1f, 1f));
                 if (dir.sqrMagnitude < 0.05f) dir = Vector3.up;
                 dir.Normalize();
+                var outward = spot.Pos - center;
+                outward.y *= 0.5f;
+                if (outward.sqrMagnitude > 1e-4f && Vector3.Dot(dir, outward.normalized) < -0.2f) dir = -dir;
+                dir.y = Mathf.Max(dir.y, -0.35f);
+                dir.Normalize();
                 float t = Mathf.Clamp01((Vector3.Dot(dir, sun) * 0.5f + 0.5f) * 0.65f + (dir.y * 0.5f + 0.5f) * 0.35f);
-                t = Mathf.Round(Mathf.Clamp01((t - 0.18f) / 0.72f) * 4f) / 4f;
-                var pos = center + Vector3.Scale(dir, radii) * R(rng, 0.92f, 1.08f);
-                var card = prim.Add(crown, ToonMeshes.Card(), art.LeafCards(ToonMeshes.FoliageColor(palette, t)), pos,
-                    Vector3.one * cardSize * R(rng, 0.8f, 1.2f), default, "LeafCard", false);
-                card.transform.rotation = CameraRotation * Quaternion.Euler(0f, 0f, R(rng, -40f, 40f));
+                t = Mathf.Round(Mathf.Clamp01((t - 0.18f) / 0.72f + R(rng, -0.28f, 0.3f)) * 4f) / 4f;   // dappled: some leaves in shade, some in the sun
+                var pos = spot.Pos + dir * spot.Size * 0.5f * R(rng, 0.92f, protrude);
+                var card = prim.Add(crown, ToonMeshes.Card(rng.Next(3)), art.LeafCards(ToonMeshes.FoliageColor(palette, t), texture), pos,
+                    Vector3.one * cardSize * R(rng, 0.75f, 1.25f), default, "LeafCard", false);
+                card.transform.rotation = CameraRotation * Quaternion.Euler(0f, 0f, R(rng, -50f, 50f));
             }
         }
 
@@ -117,8 +177,53 @@ namespace AgeOfSakura.Game
             for (int i = 0; i < count; i++)
             {
                 float a = (i + R(rng, 0f, 0.6f)) / count * Mathf.PI * 2f;
-                var root = prim.Sphere(tree, bark, new Vector3(Mathf.Cos(a) * radius, 0.03f, Mathf.Sin(a) * radius), new Vector3(radius * 1.6f, 0.09f, radius * 0.7f));
-                root.transform.localRotation = Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f);
+                var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                // a root flare: a tapering tube that leaves the trunk and dives into the ground
+                var path = new[] { dir * radius * 0.5f + Vector3.up * 0.09f, dir * radius * 1.5f + Vector3.up * 0.035f, dir * radius * 2.4f + Vector3.down * 0.01f };
+                var radii = new[] { radius * 0.55f, radius * 0.4f, radius * 0.2f };
+                prim.MeshObject(tree, ProceduralMeshes.Tube(path, radii, 6, 0.2f), bark, Vector3.zero);
+            }
+        }
+
+        /// <summary>Tapering, gently bent trunk or limb as one smooth tube.</summary>
+        private void Limb(Transform tree, Material bark, Vector3[] path, float[] radii, int sides = 8) =>
+            prim.MeshObject(tree, ProceduralMeshes.Tube(path, radii, sides, 0.3f), bark, Vector3.zero);
+
+        /// <summary>A branch from the trunk out to a crown clump: three points with a small upward bow, tapering.</summary>
+        private void Branch(Transform tree, Material bark, Vector3 from, Vector3 to, float r0, float r1, System.Random rng)
+        {
+            var mid = (from + to) * 0.5f + new Vector3(R(rng, -0.03f, 0.03f), 0.05f, R(rng, -0.03f, 0.03f));
+            Limb(tree, bark, new[] { from, mid, to }, new[] { r0, (r0 + r1) * 0.5f, r1 }, 6);
+        }
+
+        /// <summary>
+        /// Limbs from the trunk to real crown clumps (never into thin air): picks <paramref name="count"/> lower, well-spread clumps and
+        /// grows a branch into each, ending partway inside the clump.
+        /// </summary>
+        private void Boughs(Transform tree, Material bark, Vector3 from, Vector3 crownAt, List<Spot> spots, int count, float r0, float r1, System.Random rng)
+        {
+            if (spots.Count < 2) return;
+            var picked = new List<int>();
+            for (int i = 0; i < count; i++)
+            {
+                int best = -1;
+                float bestScore = float.MinValue;
+                for (int k = 1; k < spots.Count; k++)
+                {
+                    if (picked.Contains(k)) continue;
+                    var flat = new Vector2(spots[k].Pos.x, spots[k].Pos.z);
+                    float score = -spots[k].Pos.y + R(rng, 0f, 0.15f) + (flat.magnitude > 0.15f ? 0.2f : -0.5f);
+                    foreach (int j in picked)
+                    {
+                        var other = new Vector2(spots[j].Pos.x, spots[j].Pos.z);
+                        score -= Mathf.Max(0f, 0.6f - Vector2.Distance(flat, other)) * 0.9f; // spread the limbs around the trunk
+                    }
+                    if (score > bestScore) { bestScore = score; best = k; }
+                }
+                if (best < 0) break;
+                picked.Add(best);
+                var end = crownAt + Vector3.Lerp(Vector3.zero, spots[best].Pos, 0.72f);
+                Branch(tree, bark, from, end, r0, r1, rng);
             }
         }
 
@@ -132,112 +237,135 @@ namespace AgeOfSakura.Game
 
         // ------------------------------------------------------------------ trees
 
-        /// <summary>Spruce: layered, slightly drooping tiers.</summary>
+        /// <summary>Spruce: tiers of drooping, lobed branch skirts that get smaller towards the top, on a slim trunk.</summary>
         public GameObject Pine(Transform parent, Vector3 pos, System.Random rng)
         {
             var go = NewProp("Spruce", parent, pos, rng);
+            var wood = NewGroup(go, "Wood");
             float s = R(rng, 0.85f, 1.35f);
             go.transform.localScale = Vector3.one * s;
-            prim.Cylinder(go.transform, art.Lit(Palette.Bark, PaintedTexture.Bark), new Vector3(0f, 0.22f, 0f), 0.065f, 0.45f);
-            var crown = NewCrown(go, new Vector3(0f, 0.3f, 0f));
-            var stops = ToonMeshes.FoliageStops(FoliagePalette.Spruce);
-            var dark = art.Lit(stops[1]);
-            var mid = art.Lit(stops[2]);
-            var light = art.Lit(stops[3]);
-            prim.Cone(crown, dark, new Vector3(0f, 0.0f, 0f), 0.36f, 0.74f, true);
-            prim.Cone(crown, mid, new Vector3(0f, 0.4f, 0f), 0.29f, 0.64f, true);
-            prim.Cone(crown, dark, new Vector3(0f, 0.78f, 0f), 0.22f, 0.56f, true);
-            prim.Cone(crown, light, new Vector3(0f, 1.08f, 0f), 0.14f, 0.44f, true);
+            var bark = art.Lit(Palette.Bark, PaintedTexture.Bark);
+            Limb(wood, bark, new[] { new Vector3(0f, -0.02f, 0f), new Vector3(0.006f, 0.35f, 0f), new Vector3(0f, 0.9f, 0f), new Vector3(0f, 1.3f, 0f) },
+                new[] { 0.085f, 0.06f, 0.035f, 0.015f }, 8);
+            Roots(wood, bark, 3, 0.07f, rng);
+            var crown = NewCrown(go, Vector3.zero);
+            var foliageTones = new[] { art.Foliage(Color.white), art.Foliage(new Color(0.93f, 0.96f, 0.93f)), art.Foliage(new Color(0.86f, 0.92f, 0.88f)) };
+            int tiers = Near ? 9 : 7;
+            int segments = Near ? 18 : 12;
+            for (int i = 0; i < tiers; i++)
+            {
+                float f = i / (float)(tiers - 1);
+                float radius = Mathf.Lerp(0.4f, 0.09f, Mathf.Pow(f, 0.85f)) * R(rng, 0.94f, 1.06f);
+                float height = Mathf.Lerp(0.46f, 0.27f, f);
+                float y = 0.22f + f * 1.0f;
+                var mesh = ToonMeshes.SpruceTier(radius, height, rng.Next(6, 9), segments, rng.Next(5));
+                prim.Add(crown, mesh, foliageTones[i % 3], new Vector3(R(rng, -0.012f, 0.012f), y, R(rng, -0.012f, 0.012f)), Vector3.one,
+                    new Vector3(R(rng, -3f, 3f), R(rng, 0f, 360f), R(rng, -3f, 3f)), "Tier");
+            }
             Sway(crown, 1.4f, R(rng, 0.9f, 1.4f), R(rng, 0f, 6.28f));
-            BaseDecal(go.transform, 0.3f, rng);
+            BaseDecal(wood, 0.3f, rng);
+            ModelBatcher.MergeGroup(wood);
+            ModelBatcher.MergeGroup(crown);
             Fit(go, MaxRadius);
             return go;
         }
 
-        /// <summary>Oak: round crown of several clumps.</summary>
+        /// <summary>Oak: forked trunk with branches reaching into a layered crown of many clumps and leaf cards.</summary>
         public GameObject RoundTree(Transform parent, Vector3 pos, System.Random rng)
         {
             var go = NewProp("Oak", parent, pos, rng, false);
+            var wood = NewGroup(go, "Wood");
             go.transform.localScale = Vector3.one * R(rng, 0.85f, 1.25f);
             var bark = art.Lit(Palette.Bark, PaintedTexture.Bark);
-            prim.Cylinder(go.transform, bark, new Vector3(0f, 0.3f, 0f), 0.085f, 0.6f);
-            prim.Cylinder(go.transform, bark, new Vector3(0.1f, 0.62f, 0.02f), 0.04f, 0.3f, new Vector3(0f, 0f, -32f));
-            prim.Cylinder(go.transform, bark, new Vector3(-0.09f, 0.6f, 0f), 0.035f, 0.28f, new Vector3(0f, 0f, 34f));
-            Roots(go.transform, bark, 3, 0.085f, rng);
-            var crown = NewCrown(go, new Vector3(0f, 0.55f, 0f));
-            Clump(crown, FoliagePalette.Leaf, new Vector3(0f, 0.42f, 0f), new Vector3(0.98f, 0.86f, 0.98f), rng);
-            Clump(crown, FoliagePalette.Leaf, new Vector3(0.26f, 0.3f, 0.12f), new Vector3(0.66f, 0.56f, 0.66f), rng);
-            Clump(crown, FoliagePalette.Leaf, new Vector3(-0.24f, 0.28f, -0.1f), new Vector3(0.68f, 0.58f, 0.68f), rng);
-            Clump(crown, FoliagePalette.Leaf, new Vector3(0.02f, 0.74f, 0.02f), new Vector3(0.6f, 0.5f, 0.6f), rng);
-            Clump(crown, FoliagePalette.Leaf, new Vector3(-0.08f, 0.32f, 0.3f), new Vector3(0.55f, 0.5f, 0.55f), rng);
-            LeafCards(crown, FoliagePalette.Leaf, new Vector3(0f, 0.45f, 0f), new Vector3(0.55f, 0.5f, 0.55f), 12, 0.3f, rng);
+            Limb(wood, bark, new[] { new Vector3(0f, -0.04f, 0f), new Vector3(0.012f, 0.1f, 0f), new Vector3(0.03f, 0.3f, 0.01f), new Vector3(0.01f, 0.52f, 0f), new Vector3(0f, 0.66f, 0f) },
+                new[] { 0.12f, 0.092f, 0.078f, 0.07f, 0.06f }, 9);
+            Roots(wood, bark, 4, 0.085f, rng);
+            var crownAt = new Vector3(0f, 0.55f, 0f);
+            var crown = NewCrown(go, crownAt);
+            var center = new Vector3(0f, 0.42f, 0f);
+            var spots = Crown(crown, FoliagePalette.Leaf, center, new Vector3(0.52f, 0.38f, 0.52f), 13, 0.5f, 0.24f, rng);
+            Cards(crown, FoliagePalette.Leaf, spots, center, 190, 0.18f, PaintedTexture.LeafCard, rng);
+            Boughs(wood, bark, new Vector3(0f, 0.5f, 0f), crownAt, spots, 4, 0.04f, 0.016f, rng);
             Sway(crown, 1.1f, R(rng, 0.8f, 1.2f), R(rng, 0f, 6.28f));
-            BaseDecal(go.transform, 0.32f, rng);
+            BaseDecal(wood, 0.32f, rng);
+            ModelBatcher.MergeGroup(wood);
+            ModelBatcher.MergeGroup(crown);
             Fit(go, MaxRadius);
             return go;
         }
 
+        /// <summary>Cherry: short leaning trunk, wide spreading limbs, a cloud of blossom clumps and flower trusses.</summary>
         public GameObject Cherry(Transform parent, Vector3 pos, System.Random rng, float? maxRadius = null)
         {
             var go = NewProp("CherryBlossom", parent, pos, rng, false);
+            var wood = NewGroup(go, "Wood");
             go.transform.localScale = Vector3.one * 1.25f;
             var bark = art.Lit(Palette.Bark, PaintedTexture.Bark);
-            prim.Cylinder(go.transform, bark, new Vector3(0f, 0.3f, 0f), 0.09f, 0.62f, new Vector3(0f, 0f, 5f));
-            prim.Cylinder(go.transform, bark, new Vector3(0.14f, 0.7f, 0.02f), 0.05f, 0.4f, new Vector3(0f, 0f, -35f));
-            prim.Cylinder(go.transform, bark, new Vector3(-0.1f, 0.68f, 0f), 0.045f, 0.36f, new Vector3(0f, 0f, 38f));
-            Roots(go.transform, bark, 3, 0.09f, rng);
-            var crown = NewCrown(go, new Vector3(0f, 0.7f, 0f));
-            Clump(crown, FoliagePalette.Blossom, new Vector3(0f, 0.55f, 0f), new Vector3(1.05f, 0.85f, 1.05f), rng);
-            Clump(crown, FoliagePalette.Blossom, new Vector3(0.38f, 0.35f, 0.1f), new Vector3(0.7f, 0.55f, 0.7f), rng);
-            Clump(crown, FoliagePalette.Blossom, new Vector3(-0.4f, 0.38f, -0.1f), new Vector3(0.75f, 0.58f, 0.75f), rng);
-            Clump(crown, FoliagePalette.Blossom, new Vector3(0.05f, 0.85f, 0.1f), new Vector3(0.65f, 0.5f, 0.65f), rng);
-            Clump(crown, FoliagePalette.Blossom, new Vector3(-0.05f, 0.3f, 0.42f), new Vector3(0.65f, 0.5f, 0.65f), rng);
-            LeafCards(crown, FoliagePalette.Blossom, new Vector3(0f, 0.55f, 0f), new Vector3(0.6f, 0.5f, 0.6f), 14, 0.3f, rng);
+            Limb(wood, bark, new[] { new Vector3(0f, -0.04f, 0f), new Vector3(0.02f, 0.14f, 0f), new Vector3(0.05f, 0.34f, 0.01f), new Vector3(0.02f, 0.6f, 0f) },
+                new[] { 0.115f, 0.09f, 0.078f, 0.066f }, 9);
+            Roots(wood, bark, 3, 0.09f, rng);
+            var crownAt = new Vector3(0f, 0.7f, 0f);
+            var crown = NewCrown(go, crownAt);
+            var center = new Vector3(0f, 0.5f, 0f);
+            var spots = Crown(crown, FoliagePalette.Blossom, center, new Vector3(0.6f, 0.38f, 0.6f), 14, 0.5f, 0.24f, rng);
+            Cards(crown, FoliagePalette.Blossom, spots, center, 170, 0.16f, PaintedTexture.BlossomCard, rng);
+            Boughs(wood, bark, new Vector3(0.03f, 0.56f, 0f), crownAt, spots, 5, 0.04f, 0.015f, rng);
             Sway(crown, 1.0f, 0.9f, R(rng, 0f, 6.28f));
             vfx.CreatePetals(go.transform, new Vector3(0f, 1.05f, 0f));
-            BaseDecal(go.transform, 0.36f, rng);
+            BaseDecal(wood, 0.36f, rng);
+            ModelBatcher.MergeGroup(wood);
+            ModelBatcher.MergeGroup(crown);
             Fit(go, maxRadius ?? MaxRadius);
             return go;
         }
 
-        /// <summary>Birch: slim white trunk with dark scars and a light, airy crown.</summary>
+        /// <summary>Birch: slim, slightly bent white trunk with dark scars, thin limbs and a light, airy crown.</summary>
         public GameObject Birch(Transform parent, Vector3 pos, System.Random rng)
         {
             var go = NewProp("Birch", parent, pos, rng, false);
+            var wood = NewGroup(go, "Wood");
             go.transform.localScale = Vector3.one * R(rng, 0.9f, 1.25f);
             var bark = art.Lit(Hex("#ece6d6"), PaintedTexture.BirchBark);
-            prim.Cylinder(go.transform, bark, new Vector3(0f, 0.42f, 0f), 0.05f, 0.84f, new Vector3(0f, 0f, R(rng, -4f, 4f)));
-            prim.Cylinder(go.transform, bark, new Vector3(0.07f, 0.78f, 0f), 0.025f, 0.26f, new Vector3(0f, 0f, -28f));
-            var crown = NewCrown(go, new Vector3(0f, 0.85f, 0f));
-            Clump(crown, FoliagePalette.Birch, new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.72f, 0.62f), rng);
-            Clump(crown, FoliagePalette.Birch, new Vector3(0.2f, 0.12f, 0.06f), new Vector3(0.44f, 0.46f, 0.44f), rng);
-            Clump(crown, FoliagePalette.Birch, new Vector3(-0.18f, 0.16f, -0.05f), new Vector3(0.46f, 0.5f, 0.46f), rng);
-            LeafCards(crown, FoliagePalette.Birch, new Vector3(0f, 0.25f, 0f), new Vector3(0.36f, 0.4f, 0.36f), 8, 0.26f, rng);
+            float lean = R(rng, -0.05f, 0.05f);
+            Limb(wood, bark, new[] { new Vector3(0f, -0.02f, 0f), new Vector3(lean * 0.5f, 0.3f, 0f), new Vector3(lean, 0.6f, 0.01f), new Vector3(lean * 1.3f, 0.86f, 0f) },
+                new[] { 0.062f, 0.048f, 0.038f, 0.028f }, 8);
+            var crownAt = new Vector3(lean * 1.3f, 0.85f, 0f);
+            var crown = NewCrown(go, crownAt);
+            var center = new Vector3(0f, 0.28f, 0f);
+            var spots = Crown(crown, FoliagePalette.Birch, center, new Vector3(0.3f, 0.42f, 0.3f), 10, 0.34f, 0.18f, rng);
+            Cards(crown, FoliagePalette.Birch, spots, center, 120, 0.15f, PaintedTexture.LeafCard, rng);
+            Boughs(wood, bark, new Vector3(lean * 1.1f, 0.68f, 0f), crownAt, spots, 3, 0.02f, 0.008f, rng);
             Sway(crown, 1.6f, R(rng, 1f, 1.5f), R(rng, 0f, 6.28f));
-            BaseDecal(go.transform, 0.26f, rng);
+            BaseDecal(wood, 0.26f, rng);
+            ModelBatcher.MergeGroup(wood);
+            ModelBatcher.MergeGroup(crown);
             Fit(go, MaxRadius);
             return go;
         }
 
-        /// <summary>Old tree: thick gnarled trunk, wide mossy crown.</summary>
+        /// <summary>Old tree: thick, twisting trunk with heavy limbs, big roots, moss, and a wide dark crown.</summary>
         public GameObject OldTree(Transform parent, Vector3 pos, System.Random rng)
         {
             var go = NewProp("OldTree", parent, pos, rng, false);
+            var wood = NewGroup(go, "Wood");
             go.transform.localScale = Vector3.one * R(rng, 1.0f, 1.3f);
             var bark = art.Lit(Hex("#5a3e26"), PaintedTexture.Bark);
-            prim.Cylinder(go.transform, bark, new Vector3(0f, 0.33f, 0f), 0.15f, 0.66f, new Vector3(0f, 0f, 4f));
-            prim.Cylinder(go.transform, bark, new Vector3(0.2f, 0.74f, 0.02f), 0.07f, 0.45f, new Vector3(0f, 0f, -46f));
-            prim.Cylinder(go.transform, bark, new Vector3(-0.17f, 0.72f, 0.03f), 0.06f, 0.42f, new Vector3(0f, 0f, 50f));
-            prim.Cylinder(go.transform, bark, new Vector3(0.02f, 0.86f, -0.1f), 0.05f, 0.34f, new Vector3(25f, 0f, 0f));
-            Roots(go.transform, bark, 4, 0.15f, rng);
-            var crown = NewCrown(go, new Vector3(0f, 0.72f, 0f));
-            Clump(crown, FoliagePalette.Old, new Vector3(0f, 0.36f, 0f), new Vector3(1.15f, 0.7f, 1.1f), rng);
-            Clump(crown, FoliagePalette.Old, new Vector3(0.42f, 0.22f, 0.1f), new Vector3(0.72f, 0.5f, 0.7f), rng);
-            Clump(crown, FoliagePalette.Old, new Vector3(-0.42f, 0.2f, -0.06f), new Vector3(0.74f, 0.5f, 0.72f), rng);
-            Clump(crown, FoliagePalette.Old, new Vector3(0.06f, 0.62f, 0.06f), new Vector3(0.7f, 0.46f, 0.68f), rng);
-            LeafCards(crown, FoliagePalette.Old, new Vector3(0f, 0.36f, 0f), new Vector3(0.62f, 0.42f, 0.6f), 12, 0.3f, rng);
+            Limb(wood, bark, new[] { new Vector3(0f, -0.05f, 0f), new Vector3(0.02f, 0.12f, 0.01f), new Vector3(-0.03f, 0.3f, 0.02f), new Vector3(0.03f, 0.5f, -0.01f), new Vector3(0f, 0.72f, 0f) },
+                new[] { 0.19f, 0.15f, 0.135f, 0.115f, 0.09f }, 10);
+            Roots(wood, bark, 5, 0.15f, rng);
+            var crownAt = new Vector3(0f, 0.72f, 0f);
+            var moss = art.Foliage(Color.white, false);
+            foreach (var m in new[] { new Vector3(0.15f, 0.28f, 0.05f), new Vector3(-0.1f, 0.5f, 0.1f) })
+                prim.Add(wood, ToonMeshes.Blob(1, 3, 0.3f, FoliagePalette.Old), moss, m, new Vector3(0.14f, 0.09f, 0.12f), default, "Moss", false);
+            var crown = NewCrown(go, crownAt);
+            var center = new Vector3(0f, 0.36f, 0f);
+            var spots = Crown(crown, FoliagePalette.Old, center, new Vector3(0.64f, 0.32f, 0.62f), 13, 0.56f, 0.28f, rng);
+            Cards(crown, FoliagePalette.Old, spots, center, 160, 0.19f, PaintedTexture.LeafCard, rng);
+            Boughs(wood, bark, new Vector3(0f, 0.62f, 0f), crownAt, spots, 4, 0.07f, 0.024f, rng);
             Sway(crown, 0.8f, R(rng, 0.7f, 1f), R(rng, 0f, 6.28f));
-            BaseDecal(go.transform, 0.4f, rng);
+            BaseDecal(wood, 0.4f, rng);
+            ModelBatcher.MergeGroup(wood);
+            ModelBatcher.MergeGroup(crown);
             Fit(go, MaxRadius);
             return go;
         }
@@ -304,28 +432,23 @@ namespace AgeOfSakura.Game
             return go;
         }
 
-        public GameObject Shrub(Transform parent, Vector3 pos, System.Random rng)
+        /// <summary>A bush: a dark core, a ring of smaller lumps at different heights, and leaf (or blossom) cards over the outside.</summary>
+        private GameObject Bush(string name, FoliagePalette palette, PaintedTexture cardTexture, Transform parent, Vector3 pos, System.Random rng)
         {
-            var go = NewProp("Shrub", parent, pos, rng, false);
-            var m = art.Foliage(Color.white);
-            int sub = Near ? 2 : 1;
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Leaf), m, new Vector3(0f, 0.14f, 0f), new Vector3(0.44f, 0.32f, 0.44f), default, "Shrub");
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Leaf), m, new Vector3(0.14f, 0.1f, 0.06f), new Vector3(0.3f, 0.22f, 0.3f), default, "Shrub");
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Leaf), m, new Vector3(-0.12f, 0.09f, -0.08f), new Vector3(0.28f, 0.2f, 0.28f), default, "Shrub");
+            var go = NewProp(name, parent, pos, rng, false);
+            var center = new Vector3(0f, 0.14f, 0f);
+            var spots = Crown(go.transform, palette, center, new Vector3(0.11f, 0.09f, 0.11f), 7, 0.25f, 0.16f, rng);
+            Cards(go.transform, palette, spots, center, 48, 0.1f, cardTexture, rng, 1.0f);   // bushes stand next to walls: cards stay on the clumps
+            ModelBatcher.MergeGroup(go.transform);
             return go;
         }
 
+        public GameObject Shrub(Transform parent, Vector3 pos, System.Random rng) =>
+            Bush("Shrub", FoliagePalette.Leaf, PaintedTexture.LeafCard, parent, pos, rng);
+
         /// <summary>Low flowering bush in the sakura pinks (terrace corners, flower boxes).</summary>
-        public GameObject BlossomShrub(Transform parent, Vector3 pos, System.Random rng)
-        {
-            var go = NewProp("BlossomShrub", parent, pos, rng, false);
-            var m = art.Foliage(Color.white);
-            int sub = Near ? 2 : 1;
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Blossom), m, new Vector3(0f, 0.14f, 0f), new Vector3(0.44f, 0.32f, 0.44f), default, "Blossom");
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Blossom), m, new Vector3(0.13f, 0.1f, 0.06f), new Vector3(0.28f, 0.22f, 0.28f), default, "Blossom");
-            prim.Add(go.transform, ToonMeshes.Blob(sub, rng.Next(6), 0.25f, FoliagePalette.Blossom), m, new Vector3(-0.12f, 0.09f, -0.08f), new Vector3(0.26f, 0.2f, 0.26f), default, "Blossom");
-            return go;
-        }
+        public GameObject BlossomShrub(Transform parent, Vector3 pos, System.Random rng) =>
+            Bush("BlossomShrub", FoliagePalette.Blossom, PaintedTexture.BlossomCard, parent, pos, rng);
 
         public GameObject Flowers(Transform parent, Vector3 pos, System.Random rng)
         {

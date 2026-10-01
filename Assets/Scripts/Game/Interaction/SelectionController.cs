@@ -35,18 +35,23 @@ namespace AgeOfSakura.Game
                 return;
             }
 
+            // Tapping a finished building (or its bubble) collects immediately and does not open the building sheet.
+            if (TryCollect(view)) return;
+            audio.Play(AudioCue.ButtonTap);
+            Select(view.InstanceId);
+        }
+
+        /// <summary>Collects from the building under <paramref name="screen"/> if it is ready; false when there is none or it is not ready.</summary>
+        public bool TryCollectAt(Vector2 screen) => TryGetBuildingAt(screen, out var view) && TryCollect(view);
+
+        private bool TryCollect(BuildingView view)
+        {
             session.Production.Refresh();
             var instance = session.Buildings.Get(view.InstanceId);
-            if (instance.State == ProductionState.ReadyToCollect)
-            {
-                // Tapping a finished building (or its bubble) collects immediately.
-                session.Production.TryCollect(instance.InstanceId);
-                audio.Play(AudioCue.ProductionCollected);
-                Select(instance.InstanceId);
-                return;
-            }
-            audio.Play(AudioCue.ButtonTap);
-            Select(instance.InstanceId);
+            if (instance.State != ProductionState.ReadyToCollect) return false;
+            session.Production.TryCollect(instance.InstanceId);
+            audio.Play(AudioCue.ProductionCollected);
+            return true;
         }
 
         public bool TryGetBuildingAt(Vector2 screen, out BuildingView view)

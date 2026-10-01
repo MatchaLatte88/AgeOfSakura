@@ -28,7 +28,10 @@ namespace AgeOfSakura.Game
         private IDragInterceptor activeDrag;
 
         public IDragInterceptor Interceptor { get; set; }
+        /// <summary>Asked before <see cref="Interceptor"/>; claims a drag that continues a press which already did something (collect sweep).</summary>
+        public IDragInterceptor PressInterceptor { get; set; }
 
+        public event Action<Vector2> PressBegan;
         public event Action<Vector2> Tapped;
         public event Action<Vector2> LongPressed;
         public event Action<Vector2> CameraPanBegan;
@@ -44,6 +47,7 @@ namespace AgeOfSakura.Game
             float thresholdPx = config.DragThresholdDp * dpi / 160f;
             recognizer = new GestureRecognizer(thresholdPx, config.LongPressSeconds, uiHitTester.IsOverUi);
 
+            recognizer.PressBegan += p => PressBegan?.Invoke(p);
             recognizer.Tap += p => Tapped?.Invoke(p);
             recognizer.LongPress += p => LongPressed?.Invoke(p);
             recognizer.DragBegin += OnDragBegin;
@@ -69,9 +73,9 @@ namespace AgeOfSakura.Game
 
         private void OnDragBegin(Vector2 press, Vector2 current, bool afterLongPress)
         {
-            var interceptor = Interceptor;
-            if (interceptor != null && interceptor.TryBeginDrag(press, current, afterLongPress))
+            foreach (var interceptor in new[] { PressInterceptor, Interceptor })
             {
+                if (interceptor == null || !interceptor.TryBeginDrag(press, current, afterLongPress)) continue;
                 activeDrag = interceptor;
                 return;
             }

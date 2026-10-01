@@ -41,6 +41,8 @@ namespace AgeOfSakura.Game
         private float startTime;
         private float lastPinchDistance;
 
+        /// <summary>A finger touched down in the world (not on UI); fires before it is known to be a tap, long press or drag.</summary>
+        public event Action<Vector2> PressBegan;
         public event Action<Vector2> Tap;
         public event Action<Vector2> LongPress;
         /// <summary>(startPosition, currentPosition, startedAfterLongPress)</summary>
@@ -82,6 +84,7 @@ namespace AgeOfSakura.Game
                     startPosition = lastPosition = p.Position;
                     startTime = now;
                     state = isOverUi(p.Position) ? State.Ignoring : State.Pressed;
+                    if (state == State.Pressed) PressBegan?.Invoke(p.Position);
                     break;
 
                 case State.Pressed:

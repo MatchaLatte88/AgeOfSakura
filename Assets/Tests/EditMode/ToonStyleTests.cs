@@ -157,17 +157,57 @@ namespace AgeOfSakura.Tests
         }
 
         [Test]
-        public void Roofs_AreOutlineReady_AndGableEndsStayOpen()
+        public void Roofs_AreOutlineReady_AndGablesAreClosedShells()
         {
             var hip = ProceduralMeshes.HipRoof(2f, 2f, 0.6f);
             var gable = ProceduralMeshes.GableRoof(2f, 1.6f, 0.6f);
             AssertOutlineReady(hip, "HipRoof");
             AssertOutlineReady(gable, "GableRoof");
             AssertOutlineReady(ProceduralMeshes.GableWall(1.2f, 0.5f, 0.05f), "GableWall");
-            Assert.Less(gable.triangles.Length, ProceduralMeshes.Roof(2f, 1.6f, 0.6f, 1f, 0f, 0.35f, 0.05f, false).triangles.Length,
-                "an open-ended gable has fewer faces than a closed one");
             AssertWindingOutward(hip, "HipRoof");
+            // a thin closed shell (positive signed volume = every face winds outwards); an open sheet leaves the slope edges without outline
+            Assert.Greater(SignedVolume(gable), 0.01f, "GableRoof must be a closed outward-facing shell");
         }
+
+        /// <summary>Signed volume of a closed triangle mesh: positive when the winding faces outwards.</summary>
+        private static float SignedVolume(Mesh mesh)
+        {
+            var v = mesh.vertices;
+            var t = mesh.triangles;
+            float volume = 0f;
+            for (int i = 0; i < t.Length; i += 3) volume += Vector3.Dot(v[t[i]], Vector3.Cross(v[t[i + 1]], v[t[i + 2]])) / 6f;
+            return volume;
+        }
+
+        [Test]
+        public void PagodaRoofAndOrnaments_AreOutlineReady_AndFaceOutwards()
+        {
+            var spec = new ProceduralMeshes.PagodaRoofSpec(1.36f, 1.36f, 0.64f, 0.64f, 0.6f, 0.13f);
+            var roof = ProceduralMeshes.PagodaRoof(spec);
+            var curve = ProceduralMeshes.KarahafuCurve(0.78f, 0.3f);
+            var path = new[] { new Vector3(0f, 0f, 0f), new Vector3(0.1f, 0.2f, 0f), new Vector3(0f, 0.4f, 0f) };
+            var meshes = new[]
+            {
+                (roof, "PagodaRoof"),
+                (ProceduralMeshes.GableBoard(curve, 0.17f, 0.05f), "GableBoard"),
+                (ProceduralMeshes.GableCap(curve, 0.045f, 0.5f, 0.4f, 0.04f), "GableCap"),
+                (ProceduralMeshes.Tube(path, new[] { 0.05f, 0.04f, 0.02f }, 6), "Tube")
+            };
+            foreach (var (mesh, name) in meshes)
+            {
+                AssertOutlineReady(mesh, name);
+                Assert.Greater(SignedVolume(mesh), 0f, name + ": winding faces inwards");
+            }
+            // the eave corners swing up and out, the middle of a side stays low
+            var corner = spec.Hip(0f, 2);
+            var middle = spec.Point(0f, 1 * PagodaSegments + PagodaSegments / 2);
+            Assert.Greater(corner.y, middle.y + 0.05f, "corner lift");
+            Assert.Greater(new Vector2(corner.x, corner.z).magnitude, new Vector2(middle.x, middle.z).magnitude, "corners reach further out");
+            // slope steepens towards the ridge (concave roof)
+            Assert.Greater(spec.Profile(1f) - spec.Profile(0.7f), spec.Profile(0.3f) - spec.Profile(0f));
+        }
+
+        private const int PagodaSegments = ProceduralMeshes.PagodaRoofSpec.Segments;
 
         [Test]
         public void StyleConstants_MatchTheStyleDocument()

@@ -159,6 +159,90 @@ namespace AgeOfSakura.Tests
         }
 
         [Test]
+        public void TownHall_StaysWithinATriangleBudget()
+        {
+            for (int level = 1; level <= 3; level++)
+            {
+                var model = Model("town_hall", level);
+                int triangles = 0, renderers = 0;
+                foreach (var f in model.GetComponentsInChildren<MeshFilter>())
+                {
+                    if (!f.gameObject.activeInHierarchy || f.sharedMesh == null) continue;
+                    triangles += f.sharedMesh.triangles.Length / 3;
+                    renderers++;
+                }
+                TestContext.Out.WriteLine($"town_hall level {level}: {triangles} triangles in {renderers} renderers");
+                Assert.LessOrEqual(triangles, 45000, $"town_hall level {level} is too heavy for a phone ({triangles} triangles)");
+            }
+        }
+
+        [Test]
+        public void Vegetation_StaysWithinTriangleAndRendererBudgets()
+        {
+            var rng = new System.Random(11);
+            var parent = new GameObject("Vegetation").transform;
+            created.Add(parent.gameObject);
+            var makers = new Dictionary<string, System.Func<GameObject>>
+            {
+                { "Spruce", () => props.Pine(parent, Vector3.zero, rng) },
+                { "Oak", () => props.RoundTree(parent, Vector3.zero, rng) },
+                { "Sakura", () => props.Cherry(parent, Vector3.zero, rng) },
+                { "Birch", () => props.Birch(parent, Vector3.zero, rng) },
+                { "Old tree", () => props.OldTree(parent, Vector3.zero, rng) },
+                { "Shrub", () => props.Shrub(parent, Vector3.zero, rng) },
+                { "Blossom shrub", () => props.BlossomShrub(parent, Vector3.zero, rng) }
+            };
+            foreach (bool near in new[] { true, false })
+            {
+                props.AnimateProps = near;
+                foreach (var pair in makers)
+                {
+                    var prop = pair.Value();
+                    int triangles = 0, renderers = 0;
+                    foreach (var f in prop.GetComponentsInChildren<MeshFilter>())
+                    {
+                        if (!f.gameObject.activeInHierarchy || f.sharedMesh == null) continue;
+                        triangles += f.sharedMesh.triangles.Length / 3;
+                        renderers++;
+                    }
+                    TestContext.Out.WriteLine($"{(near ? "near" : "far ")} {pair.Key}: {triangles} triangles in {renderers} renderers");
+                    bool shrub = pair.Key.EndsWith("hrub");
+                    Assert.LessOrEqual(triangles, near ? (shrub ? 2500 : 6000) : (shrub ? 1500 : 3500), $"{(near ? "near" : "far")} {pair.Key} is too heavy ({triangles} triangles)");
+                    Assert.LessOrEqual(renderers, 40, $"{pair.Key} is not merged into few renderers ({renderers})");
+                }
+            }
+            props.AnimateProps = true;
+        }
+
+        [Test]
+        public void Actors_AreMergedIntoFewRenderers_AndStayWithinABudget()
+        {
+            var actors = new ActorFactory(art, prim);
+            for (int variant = 0; variant < ActorFactory.VillagerVariants; variant++)
+                CountActor($"villager {variant}", actors.Villager(variant), 6000, 60);
+            CountActor("dog", actors.Dog(), 4000, 40);
+            CountActor("hen", actors.Chicken(true), 3000, 40);
+        }
+
+        private void CountActor(string name, ActorVisual actor, int maxTriangles, int maxRenderers)
+        {
+            created.Add(actor.Root);
+            int triangles = 0, renderers = 0;
+            foreach (var f in actor.Root.GetComponentsInChildren<MeshFilter>())
+            {
+                if (!f.gameObject.activeInHierarchy || f.sharedMesh == null) continue;
+                triangles += f.sharedMesh.triangles.Length / 3;
+                renderers++;
+            }
+            TestContext.Out.WriteLine($"{name}: {triangles} triangles in {renderers} renderers");
+            Assert.LessOrEqual(triangles, maxTriangles, $"{name} is too heavy ({triangles} triangles)");
+            Assert.LessOrEqual(renderers, maxRenderers, $"{name} is not merged into few renderers ({renderers})");
+            // every pose must run without throwing (missing joints would show up as a NullReferenceException here)
+            actor.Animate(NpcState.Idle, 1f, 0f);
+            actor.Animate(NpcState.Walking, 1f, 0.7f);
+        }
+
+        [Test]
         public void ModelsAreMergedIntoFewRenderers()
         {
             foreach (var id in ProceduralBuildingModels.KnownVisualIds)

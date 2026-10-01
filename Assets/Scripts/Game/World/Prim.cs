@@ -7,10 +7,22 @@ namespace AgeOfSakura.Game
     {
         private readonly GameArt art;
 
+        /// <summary>Smallest side below which <see cref="ThinBoxes"/> swaps the rounded box for a flat one (a bevel that small is invisible).</summary>
+        public const float ThinLimit = 0.065f;
+
+        /// <summary>
+        /// While set, boxes with a side under <see cref="ThinLimit"/> use the 12-triangle flat box instead of the 108-triangle rounded box.
+        /// Detailed models (the Town Hall has hundreds of bars and slats) switch it on while they build.
+        /// </summary>
+        public bool ThinBoxes { get; set; }
+
         public Prim(GameArt art)
         {
             this.art = art;
         }
+
+        private Mesh BoxMesh(Vector3 size) =>
+            ThinBoxes && Mathf.Min(size.x, Mathf.Min(size.y, size.z)) < ThinLimit ? ToonMeshes.SharpBox(size) : ToonMeshes.RoundedBox(size);
 
         public GameObject Add(Transform parent, Mesh mesh, Material material, Vector3 localPosition, Vector3 localScale, Vector3 localEuler = default, string name = null, bool castShadows = true)
         {
@@ -29,11 +41,11 @@ namespace AgeOfSakura.Game
 
         /// <summary>Rounded box of exactly <paramref name="size"/> centred on <paramref name="center"/> (never a hard cube edge).</summary>
         public GameObject Box(Transform parent, Material m, Vector3 center, Vector3 size, Vector3 euler = default, bool castShadows = true) =>
-            Add(parent, ToonMeshes.RoundedBox(size), m, center, Vector3.one, euler, "Box", castShadows);
+            Add(parent, BoxMesh(size), m, center, Vector3.one, euler, "Box", castShadows);
 
         /// <summary>Rounded box whose bottom face sits at <paramref name="baseCenter"/>.y.</summary>
         public GameObject BoxOnGround(Transform parent, Material m, Vector3 baseCenter, Vector3 size, Vector3 euler = default) =>
-            Add(parent, ToonMeshes.RoundedBox(size), m, baseCenter + new Vector3(0f, size.y * 0.5f, 0f), Vector3.one, euler, "Box");
+            Add(parent, BoxMesh(size), m, baseCenter + new Vector3(0f, size.y * 0.5f, 0f), Vector3.one, euler, "Box");
 
         /// <summary>Vertical cylinder with rounded rims centred on <paramref name="center"/>.</summary>
         public GameObject Cylinder(Transform parent, Material m, Vector3 center, float radius, float height, Vector3 euler = default, bool castShadows = true) =>

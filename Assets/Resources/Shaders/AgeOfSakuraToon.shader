@@ -53,6 +53,7 @@ Shader "AgeOfSakura/Toon"
         float4 _AoS_HemiGround;
         float4 _AoS_Gradient;
         float4 _AoS_FoliageTint;
+        float4 _AoS_Grade;  // x: saturation delta, y: S-curve contrast amount, z: warm/cool split (see ToonStyle.ApplyLighting)
         float4 _AoS_Params; // x: glow multiplier (windows and lantern flames burn stronger at night)
         ENDHLSL
 
@@ -165,6 +166,13 @@ Shader "AgeOfSakura/Toon"
                 #if defined(UNITY_COLORSPACE_GAMMA)
                 lit = LinearToSRGB(lit);
                 #endif
+
+                // colour grade in display space (all deltas, so an unset global means "neutral"): saturation, S-curve contrast, warm highlights / cool shadows
+                half luma = dot(lit, half3(0.299, 0.587, 0.114));
+                lit = lerp(luma.xxx, lit, 1.0 + _AoS_Grade.x);
+                lit = lerp(lit, lit * lit * (3.0 - 2.0 * lit), _AoS_Grade.y);
+                lit += _AoS_Grade.z * (luma - 0.5) * half3(1.0, 0.0, -1.0);
+                lit = saturate(lit);
                 return half4(lit, albedo.a);
             }
             ENDHLSL
