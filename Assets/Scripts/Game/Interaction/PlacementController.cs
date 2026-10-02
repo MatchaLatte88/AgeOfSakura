@@ -98,6 +98,29 @@ namespace AgeOfSakura.Game
             return true;
         }
 
+        private static readonly (int dx, int dz)[] ChainDirections = { (1, 0), (0, 1), (-1, 0), (0, -1) };
+        private int chainDirection;
+
+        /// <summary>Roads are laid cell by cell: after one is placed the next ghost appears on the free neighbour, going on in the same direction when it can.</summary>
+        private void BeginChain(BuildingDefinition def, GridPos last)
+        {
+            if (!session.Wallet.CanAfford(def.BuildCost)) return;
+            for (int i = 0; i < ChainDirections.Length; i++)
+            {
+                int d = (chainDirection + i) % ChainDirections.Length;
+                var next = new GridPos(last.X + ChainDirections[d].dx, last.Z + ChainDirections[d].dz);
+                if (session.Grid.CheckPlacement(next, def.FootprintWidth, def.FootprintHeight, null, def.RuleFor(0)) != PlacementCheck.Ok) continue;
+                chainDirection = d;
+                definition = def;
+                Mode = PlacementMode.PlaceNew;
+                movingInstanceId = null;
+                rotation = 0;
+                origin = next;
+                EnterMode();
+                return;
+            }
+        }
+
         public bool BeginMove(string instanceId)
         {
             if (IsActive) Cancel();
@@ -153,8 +176,11 @@ namespace AgeOfSakura.Game
                     return false;
                 }
                 audio.Play(AudioCue.BuildingPlaced);
+                var placedDefinition = definition;
+                var placedOrigin = origin;
                 ExitMode();
                 BuildingPlaced?.Invoke(result.Instance);
+                if (placedDefinition.Chain) BeginChain(placedDefinition, placedOrigin);
                 return true;
             }
 
@@ -241,7 +267,7 @@ namespace AgeOfSakura.Game
                     {
                         if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz)) != r) continue;
                         var p = new GridPos(cx + dx, cz + dz);
-                        if (session.Grid.CheckPlacement(p, w, h) == PlacementCheck.Ok) return p;
+                        if (session.Grid.CheckPlacement(p, w, h, null, definition.RuleFor(rotation)) == PlacementCheck.Ok) return p;
                     }
                 }
             }
@@ -297,7 +323,7 @@ namespace AgeOfSakura.Game
         private void Revalidate()
         {
             var (w, h) = Size();
-            Check = session.Grid.CheckPlacement(origin, w, h, movingInstanceId);
+            Check = session.Grid.CheckPlacement(origin, w, h, movingInstanceId, definition.RuleFor(rotation));
             CanAfford = Mode != PlacementMode.PlaceNew || session.Wallet.CanAfford(definition.BuildCost);
 
             var (cx, cz) = session.Grid.FootprintCenterToWorld(origin, w, h);
@@ -318,6 +344,7 @@ namespace AgeOfSakura.Game
                 case PlacementCheck.Locked: return Loc.T("place.locked");
                 case PlacementCheck.BlockedTerrain: return Loc.T("place.blocked");
                 case PlacementCheck.Occupied: return Loc.T("place.occupied");
+                case PlacementCheck.NeedsShore: return Loc.T("place.shore");
                 default: return check.ToString();
             }
         }

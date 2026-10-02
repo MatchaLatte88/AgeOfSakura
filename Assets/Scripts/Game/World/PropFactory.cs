@@ -432,6 +432,26 @@ namespace AgeOfSakura.Game
             return go;
         }
 
+        /// <summary>A mountain cell: a heap of large rock lumps (taller where more mountain lies around it) with a pale crest.</summary>
+        public GameObject MountainRock(Transform parent, Vector3 pos, System.Random rng, float height)
+        {
+            var go = NewProp("Mountain", parent, pos, rng);
+            var mats = new[] { art.Lit(Palette.RockA, PaintedTexture.Stone), art.Lit(Palette.RockB, PaintedTexture.Stone), art.Lit(Palette.RockC, PaintedTexture.Stone) };
+            for (int i = 0; i < 3; i++)
+            {
+                float size = R(rng, 0.62f, 0.85f);
+                float h = height * R(rng, 0.7f, 1.05f) * (i == 0 ? 1f : 0.7f);
+                var offset = i == 0 ? Vector3.zero : new Vector3(R(rng, -0.3f, 0.3f), 0f, R(rng, -0.3f, 0.3f));
+                var scale = new Vector3(size * 1.5f, h, size * 1.5f);
+                var rock = prim.Add(go.transform, ToonMeshes.Blob(Near ? 2 : 1, 30 + rng.Next(5), 0.2f, FoliagePalette.None), mats[rng.Next(mats.Length)],
+                    offset + new Vector3(0f, h * 0.3f, 0f), scale, default, "Lump");
+                rock.transform.localRotation = Quaternion.Euler(R(rng, -6f, 6f), R(rng, 0f, 360f), R(rng, -6f, 6f));
+            }
+            prim.Add(go.transform, ToonMeshes.Blob(1, 5, 0.25f, FoliagePalette.None), art.Lit(Palette.RockC, PaintedTexture.Stone),
+                new Vector3(0f, height * 0.78f, 0f), new Vector3(0.7f, height * 0.4f, 0.7f), default, "Crest");
+            return go;
+        }
+
         /// <summary>A bush: a dark core, a ring of smaller lumps at different heights, and leaf (or blossom) cards over the outside.</summary>
         private GameObject Bush(string name, FoliagePalette palette, PaintedTexture cardTexture, Transform parent, Vector3 pos, System.Random rng)
         {

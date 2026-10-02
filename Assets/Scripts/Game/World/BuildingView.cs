@@ -66,7 +66,7 @@ namespace AgeOfSakura.Game
             modelInfo = model.GetComponent<BuildingModel>();
             if (modelInfo == null) modelInfo = model.AddComponent<BuildingModel>();
 
-            if (def.Levels.Count > 0 && instance.Level > 1) AddLevelMarks(instance.Level, def);
+            if (def.Levels.Count > 0 && instance.Level > 1 && def.Category != "civic") AddLevelMarks(instance.Level, def);
 
             selectionVisual = new GameObject("SelectionVisual");
             selectionVisual.transform.SetParent(transform, false);
@@ -152,6 +152,13 @@ namespace AgeOfSakura.Game
                 prim.Box(marks, red, basePos + new Vector3(-sx * 0.13f, 1.15f, 0f), new Vector3(0.22f, 0.6f, 0.02f));
                 prim.Box(marks, gold, basePos + new Vector3(-sx * 0.13f, 1.43f, 0f), new Vector3(0.22f, 0.045f, 0.025f));
             }
+        }
+
+        /// <summary>Roads only: which neighbours the paving reaches toward (see <see cref="RoadSurface"/>).</summary>
+        public void SetRoadMask(int mask)
+        {
+            var surface = CurrentModel != null ? CurrentModel.GetComponentInChildren<RoadSurface>(true) : null;
+            if (surface != null) surface.SetMask(mask);
         }
 
         public bool IsSelected => selectionVisual.activeSelf;

@@ -70,8 +70,9 @@ namespace AgeOfSakura.Core
         public PlacementCheck CheckPlacement(string definitionId, GridPos origin, int rotation, string ignoreInstanceId = null)
         {
             var def = defs.GetBuilding(definitionId);
+            rotation = def.Rotatable ? Footprint.NormalizeRotation(rotation) : 0;
             Footprint.Size(def.FootprintWidth, def.FootprintHeight, rotation, out int w, out int h);
-            return grid.CheckPlacement(origin, w, h, ignoreInstanceId);
+            return grid.CheckPlacement(origin, w, h, ignoreInstanceId, def.RuleFor(rotation));
         }
 
         public bool CanAfford(string definitionId) => wallet.CanAfford(defs.GetBuilding(definitionId).BuildCost);
@@ -87,7 +88,7 @@ namespace AgeOfSakura.Core
 
             rotation = def.Rotatable ? Footprint.NormalizeRotation(rotation) : 0;
             Footprint.Size(def.FootprintWidth, def.FootprintHeight, rotation, out int w, out int h);
-            var check = grid.CheckPlacement(origin, w, h);
+            var check = grid.CheckPlacement(origin, w, h, null, def.RuleFor(rotation));
             if (check != PlacementCheck.Ok) return new PlaceResult(PlaceStatus.InvalidPlacement, check, null);
             if (!wallet.CanAfford(def.BuildCost)) return new PlaceResult(PlaceStatus.CannotAfford, check, null);
 
@@ -139,13 +140,13 @@ namespace AgeOfSakura.Core
                 restored.Level = def.MaxLevel;
             }
             Footprint.Size(def.FootprintWidth, def.FootprintHeight, restored.Rotation, out int w, out int h);
-            var check = grid.CheckPlacement(restored.Origin, w, h);
+            var check = grid.CheckPlacement(restored.Origin, w, h, null, def.RuleFor(restored.Rotation));
             if (check != PlacementCheck.Ok)
             {
                 GameLog.Error(LogCategory.Building, $"Saved {def.Id} at {restored.Origin} is not placeable ({check}); skipped.");
                 return false;
             }
-            grid.Occupy(restored.InstanceId, restored.Origin, w, h);
+            grid.Occupy(restored.InstanceId, restored.Origin, w, h, def.RuleFor(restored.Rotation));
             buildings.Add(restored);
             byId[restored.InstanceId] = restored;
             BuildingPlaced?.Invoke(restored);
@@ -171,7 +172,7 @@ namespace AgeOfSakura.Core
 
             var oldOrigin = instance.Origin;
             int oldRotation = instance.Rotation;
-            var check = grid.Move(instanceId, newOrigin, w, h);
+            var check = grid.Move(instanceId, newOrigin, w, h, def.RuleFor(newRotation));
             if (check != PlacementCheck.Ok) return check;
 
             instance.Origin = newOrigin;
@@ -184,7 +185,7 @@ namespace AgeOfSakura.Core
         private BuildingInstance Create(BuildingDefinition def, GridPos origin, int rotation, string instanceId)
         {
             Footprint.Size(def.FootprintWidth, def.FootprintHeight, rotation, out int w, out int h);
-            grid.Occupy(instanceId, origin, w, h);
+            grid.Occupy(instanceId, origin, w, h, def.RuleFor(rotation));
             var instance = new BuildingInstance
             {
                 InstanceId = instanceId,

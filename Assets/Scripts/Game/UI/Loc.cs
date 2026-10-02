@@ -47,6 +47,7 @@ namespace AgeOfSakura.Game
             { "place.locked", new[] { "This land is not unlocked yet", "Dieses Land ist noch gesperrt" } },
             { "place.blocked", new[] { "Blocked by terrain", "Durch Gelände blockiert" } },
             { "place.occupied", new[] { "Space is already taken", "Hier steht schon etwas" } },
+            { "place.shore", new[] { "Needs land at one end and its place at the other: a dock the water, a mine the mountain", "Braucht Land an einem Ende und seinen Platz am anderen: Dock das Wasser, Mine den Berg" } },
             { "save.corrupt", new[] { "The save file was damaged. A new game was started (the old file was kept).", "Der Spielstand war beschädigt. Ein neues Spiel wurde gestartet (die alte Datei bleibt erhalten)." } },
             { "save.too_new", new[] { "This save is from a newer version. Playing a temporary game; the save is untouched.", "Dieser Spielstand stammt aus einer neueren Version. Du spielst ein temporäres Spiel; der Spielstand bleibt unberührt." } },
 
@@ -54,6 +55,9 @@ namespace AgeOfSakura.Game
             { "currency.wood", new[] { "Wood", "Holz" } },
             { "currency.diamonds", new[] { "Diamonds", "Diamanten" } },
             { "currency.rice", new[] { "Rice", "Reis" } },
+            { "currency.tools", new[] { "Tools", "Werkzeug" } },
+            { "currency.fish", new[] { "Fish", "Fisch" } },
+            { "currency.iron", new[] { "Iron", "Eisen" } },
 
             { "upgrade", new[] { "Upgrade", "Aufwerten" } },
             { "upgrade.to", new[] { "Upgrade to Lv.{0}", "Aufwerten auf St.{0}" } },
@@ -74,6 +78,8 @@ namespace AgeOfSakura.Game
             { "need.beauty", new[] { "Beauty nearby: {0} / {1}", "Schönheit in der Nähe: {0} / {1}" } },
             { "need.faith", new[] { "Faith nearby: {0} / {1}", "Glaube in der Nähe: {0} / {1}" } },
             { "need.noise", new[] { "Quiet: noise {0} (at most {1})", "Ruhe: Lärm {0} (höchstens {1})" } },
+            { "need.connected", new[] { "Connected to the Town Hall by road", "Per Straße mit dem Rathaus verbunden" } },
+            { "need.connected.hint", new[] { "Lay roads from the Town Hall to the house", "Lege Straßen vom Rathaus bis zum Haus" } },
             { "need.served.hint", new[] { "Feed the house with Rice and collect its taxes", "Versorge das Haus mit Reis und sammle Steuern" } },
             { "need.beauty.hint", new[] { "Build a Garden or Shrine nearby, or live by cherry trees and water", "Baue Garten oder Schrein in der Nähe, oder wohne bei Kirschbäumen und Wasser" } },
             { "need.faith.hint", new[] { "Build a Shrine nearby", "Baue einen Schrein in der Nähe" } },
@@ -87,10 +93,13 @@ namespace AgeOfSakura.Game
             { "goal.need.served", new[] { "Keep the house supplied ({0}/{1})", "Halte das Haus versorgt ({0}/{1})" } },
             { "goal.need.beauty", new[] { "A house wants more Beauty: build a Garden nearby", "Ein Haus wünscht mehr Schönheit: baue einen Garten in der Nähe" } },
             { "goal.need.faith", new[] { "A house wants Faith: build a Shrine nearby", "Ein Haus wünscht Glaube: baue einen Schrein in der Nähe" } },
+            { "goal.forge_tools", new[] { "Forge tools at the Blacksmith ({0} more)", "Schmiede Werkzeug beim Schmied (noch {0})" } },
+            { "goal.catch_fish", new[] { "Catch fish at the Fisher Dock", "Fange Fisch am Fischerdock" } },
+            { "goal.need.connected", new[] { "A house wants a road: connect it to the Town Hall", "Ein Haus wünscht eine Straße: verbinde es mit dem Rathaus" } },
             { "goal.need.noise", new[] { "A house finds it too loud: move the Woodcutter", "Einem Haus ist es zu laut: verschiebe den Holzfäller" } },
 
             { "building.town_hall.name", new[] { "Town Hall", "Rathaus" } },
-            { "building.town_hall.description", new[] { "The heart of your settlement.", "Das Herz deiner Siedlung." } },
+            { "building.town_hall.description", new[] { "The heart of your settlement. Growing it opens new land.", "Das Herz deiner Siedlung. Wächst es, öffnet sich neues Land." } },
             { "building.woodcutter.name", new[] { "Woodcutter", "Holzfäller" } },
             { "building.woodcutter.description", new[] { "Fells timber for construction.", "Fällt Holz für den Bau." } },
             { "building.house.name", new[] { "House", "Haus" } },
@@ -99,6 +108,14 @@ namespace AgeOfSakura.Game
             { "building.rice_paddy.description", new[] { "Flooded fields that feed your people.", "Geflutete Felder, die deine Leute ernähren." } },
             { "building.garden.name", new[] { "Stone Garden", "Steingarten" } },
             { "building.garden.description", new[] { "A raked garden. Neighbours enjoy the view.", "Ein geharkter Garten. Die Nachbarn genießen den Anblick." } },
+            { "building.blacksmith.name", new[] { "Blacksmith", "Schmied" } },
+            { "building.blacksmith.description", new[] { "Forges tools from wood and iron. Later buildings need them.", "Schmiedet aus Holz und Eisen Werkzeug. Spätere Gebäude brauchen es." } },
+            { "building.fisher_dock.name", new[] { "Fisher Dock", "Fischerdock" } },
+            { "building.fisher_dock.description", new[] { "A pier on the river. Boats bring in fish.", "Ein Steg am Fluss. Boote bringen Fisch." } },
+            { "building.mine.name", new[] { "Mine", "Mine" } },
+            { "building.mine.description", new[] { "Digs iron out of the mountain. The smith needs it.", "Fördert Eisen aus dem Berg. Der Schmied braucht es." } },
+            { "building.road.name", new[] { "Road", "Straße" } },
+            { "building.road.description", new[] { "Connects buildings to the Town Hall.", "Verbindet Gebäude mit dem Rathaus." } },
             { "building.shrine.name", new[] { "Shrine", "Schrein" } },
             { "building.shrine.description", new[] { "A small shrine. Faith lifts the spirit nearby.", "Ein kleiner Schrein. Der Glaube hebt die Stimmung ringsum." } },
 
@@ -111,6 +128,15 @@ namespace AgeOfSakura.Game
             { "production.rice_small", new[] { "Small Harvest", "Kleine Ernte" } },
             { "production.rice_medium", new[] { "Normal Harvest", "Normale Ernte" } },
             { "production.rice_large", new[] { "Large Harvest", "Große Ernte" } },
+            { "production.tools_small", new[] { "Small Batch", "Kleine Charge" } },
+            { "production.tools_medium", new[] { "Normal Batch", "Normale Charge" } },
+            { "production.tools_large", new[] { "Large Batch", "Große Charge" } },
+            { "production.iron_small", new[] { "Small Haul", "Kleine Fuhre" } },
+            { "production.iron_medium", new[] { "Normal Haul", "Normale Fuhre" } },
+            { "production.iron_large", new[] { "Large Haul", "Große Fuhre" } },
+            { "production.fish_small", new[] { "Small Catch", "Kleiner Fang" } },
+            { "production.fish_medium", new[] { "Normal Catch", "Normaler Fang" } },
+            { "production.fish_large", new[] { "Large Catch", "Großer Fang" } },
         };
 
         public static Language Current { get; set; } = Detect();
@@ -154,6 +180,8 @@ namespace AgeOfSakura.Game
                 case GoalKind.Build: return T("hint.build", BuildingName(buildingDef));
                 case GoalKind.Gather: return T("goal.gather", goal.Amount, Currency(goal.Currency), BuildingName(buildingDef));
                 case GoalKind.HarvestRice: return T("goal.harvest_rice");
+                case GoalKind.ForgeTools: return T("goal.forge_tools", goal.Amount);
+                case GoalKind.CatchFish: return T("goal.catch_fish");
                 case GoalKind.StartTaxes: return T("goal.start_taxes");
                 case GoalKind.CollectTaxes: return T("goal.collect_taxes");
                 case GoalKind.UpgradeHouse: return T("goal.upgrade");

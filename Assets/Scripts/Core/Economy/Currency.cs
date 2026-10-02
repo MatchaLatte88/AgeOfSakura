@@ -8,7 +8,13 @@ namespace AgeOfSakura.Core
         Wood,
         Diamonds,
         /// <summary>Food: produced by the Rice Paddy, consumed by houses when they collect taxes.</summary>
-        Rice
+        Rice,
+        /// <summary>Crafted by the Blacksmith from Wood; later buildings and upgrades are built with it.</summary>
+        Tools,
+        /// <summary>Food: caught from the Fisher Dock, eaten by better houses besides Rice.</summary>
+        Fish,
+        /// <summary>Mined from a mountain; the Blacksmith forges it together with Wood into Tools.</summary>
+        Iron
     }
 
     /// <summary>Why a balance changed. Kept for future analytics / economy balancing.</summary>

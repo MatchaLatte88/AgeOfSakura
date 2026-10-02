@@ -90,6 +90,7 @@ namespace AgeOfSakura.Game
             views = new BuildingViewManager(session, world, art, prim, models, vfx, cameraController.Rotation);
             var actors = new ActorFactory(art, prim);
             NpcManager.Create(runtimeRoot.transform, session, actors);
+            FishingBoatManager.Create(runtimeRoot.transform, session, art, prim, actors);
 
             IAudioService audio = new NullAudioService();
             var selection = new SelectionController(session, cameraController, views, audio);

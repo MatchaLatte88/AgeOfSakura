@@ -96,6 +96,7 @@ namespace AgeOfSakura.Core
                 }
 
                 EnsureTownHall();
+                Housing.ApplyExpansions(); // land earned by the Town Hall's level
                 Production.Refresh(); // offline completion: elapsed timers become ReadyToCollect, rewards stay ungranted
             }
             finally

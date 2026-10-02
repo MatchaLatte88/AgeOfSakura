@@ -10,7 +10,7 @@ namespace AgeOfSakura.Tests
         public void ShippedDefinitions_AreValid()
         {
             var defs = TestData.Definitions();
-            Assert.AreEqual(6, defs.Buildings.Count);
+            Assert.AreEqual(10, defs.Buildings.Count);
             Assert.AreEqual(3, defs.GetBuilding("woodcutter").ProductionIds.Count);
             Assert.AreEqual(3, defs.GetBuilding("house").MaxLevel);
         }
@@ -46,7 +46,10 @@ namespace AgeOfSakura.Tests
         [Test]
         public void Loader_ThrowsOnInvalidMap()
         {
-            string json = TestData.DefinitionsJson().Replace("\".TT.TTTs..T...BTTT~~\"", "\"short\"");
+            string json = TestData.DefinitionsJson();
+            string firstRow = TestData.Definitions().Map.Rows[0];
+            json = json.Replace("\"" + firstRow + "\"", "\"short\"");
+            Assert.AreNotEqual(TestData.DefinitionsJson(), json, "the test must actually damage the map");
             Assert.Throws<DefinitionException>(() => DefinitionLoader.LoadValidated(json));
         }
 

@@ -125,6 +125,10 @@
         {
           "currency": "Rice",
           "amount": 3
+        },
+        {
+          "currency": "Fish",
+          "amount": 1
         }
       ],
       "rewards": [
@@ -142,6 +146,10 @@
         {
           "currency": "Rice",
           "amount": 4
+        },
+        {
+          "currency": "Fish",
+          "amount": 2
         }
       ],
       "rewards": [
@@ -150,13 +158,148 @@
           "amount": 120
         }
       ]
+    },
+    {
+      "id": "tools_small",
+      "displayName": "Small Batch",
+      "durationSeconds": 45,
+      "inputs": [
+        {
+          "currency": "Wood",
+          "amount": 3
+        },
+        {
+          "currency": "Iron",
+          "amount": 2
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Tools",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "tools_medium",
+      "displayName": "Normal Batch",
+      "durationSeconds": 150,
+      "inputs": [
+        {
+          "currency": "Wood",
+          "amount": 10
+        },
+        {
+          "currency": "Iron",
+          "amount": 7
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Tools",
+          "amount": 8
+        }
+      ]
+    },
+    {
+      "id": "tools_large",
+      "displayName": "Large Batch",
+      "durationSeconds": 360,
+      "inputs": [
+        {
+          "currency": "Wood",
+          "amount": 22
+        },
+        {
+          "currency": "Iron",
+          "amount": 16
+        }
+      ],
+      "rewards": [
+        {
+          "currency": "Tools",
+          "amount": 20
+        }
+      ]
+    },
+    {
+      "id": "fish_small",
+      "displayName": "Small Catch",
+      "durationSeconds": 60,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Fish",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "fish_medium",
+      "displayName": "Normal Catch",
+      "durationSeconds": 180,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Fish",
+          "amount": 18
+        }
+      ]
+    },
+    {
+      "id": "fish_large",
+      "displayName": "Large Catch",
+      "durationSeconds": 420,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Fish",
+          "amount": 45
+        }
+      ]
+    },
+    {
+      "id": "iron_small",
+      "displayName": "Small Haul",
+      "durationSeconds": 45,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Iron",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "id": "iron_medium",
+      "displayName": "Normal Haul",
+      "durationSeconds": 150,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Iron",
+          "amount": 14
+        }
+      ]
+    },
+    {
+      "id": "iron_large",
+      "displayName": "Large Haul",
+      "durationSeconds": 360,
+      "inputs": [],
+      "rewards": [
+        {
+          "currency": "Iron",
+          "amount": 36
+        }
+      ]
     }
   ],
   "buildings": [
     {
       "id": "town_hall",
       "displayName": "Town Hall",
-      "description": "The heart of your settlement.",
+      "description": "The heart of your settlement. Growing it opens new land.",
       "category": "civic",
       "visualId": "town_hall",
       "iconId": "town_hall",
@@ -169,7 +312,66 @@
       "movable": false,
       "rotatable": false,
       "buildable": false,
-      "visualLevel": 1
+      "visualLevel": 1,
+      "levels": [
+        {
+          "level": 1
+        },
+        {
+          "level": 2,
+          "upgradeCost": [
+            {
+              "currency": "Wood",
+              "amount": 120
+            },
+            {
+              "currency": "Coins",
+              "amount": 300
+            },
+            {
+              "currency": "Tools",
+              "amount": 6
+            }
+          ],
+          "needs": [
+            {
+              "kind": "beauty",
+              "min": 3
+            },
+            {
+              "kind": "faith",
+              "min": 1
+            }
+          ]
+        },
+        {
+          "level": 3,
+          "upgradeCost": [
+            {
+              "currency": "Wood",
+              "amount": 250
+            },
+            {
+              "currency": "Coins",
+              "amount": 800
+            },
+            {
+              "currency": "Tools",
+              "amount": 15
+            }
+          ],
+          "needs": [
+            {
+              "kind": "beauty",
+              "min": 6
+            },
+            {
+              "kind": "faith",
+              "min": 2
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "woodcutter",
@@ -276,6 +478,10 @@
             {
               "currency": "Coins",
               "amount": 100
+            },
+            {
+              "currency": "Tools",
+              "amount": 5
             }
           ],
           "needs": [
@@ -286,6 +492,10 @@
             {
               "kind": "beauty",
               "min": 2
+            },
+            {
+              "kind": "connected",
+              "min": 1
             }
           ],
           "productions": [
@@ -302,6 +512,10 @@
             {
               "currency": "Coins",
               "amount": 300
+            },
+            {
+              "currency": "Tools",
+              "amount": 10
             }
           ],
           "needs": [
@@ -333,6 +547,146 @@
       "visualLevel": 1
     },
     {
+      "id": "mine",
+      "displayName": "Mine",
+      "description": "Digs iron out of the mountain. The smith needs it.",
+      "category": "production",
+      "visualId": "mine",
+      "iconId": "mine",
+      "footprint": {
+        "width": 2,
+        "height": 3
+      },
+      "shore": true,
+      "pierCells": 1,
+      "pierTerrain": "Mountain",
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 40
+        },
+        {
+          "currency": "Coins",
+          "amount": 120
+        }
+      ],
+      "productions": [
+        "iron_small",
+        "iron_medium",
+        "iron_large"
+      ],
+      "emits": [
+        {
+          "variable": "noise",
+          "value": 3,
+          "radius": 4
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "blacksmith",
+      "displayName": "Blacksmith",
+      "description": "Forges tools from wood and iron. Later buildings need them.",
+      "category": "production",
+      "visualId": "blacksmith",
+      "iconId": "blacksmith",
+      "footprint": {
+        "width": 2,
+        "height": 2
+      },
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 30
+        },
+        {
+          "currency": "Coins",
+          "amount": 120
+        }
+      ],
+      "productions": [
+        "tools_small",
+        "tools_medium",
+        "tools_large"
+      ],
+      "emits": [
+        {
+          "variable": "noise",
+          "value": 2,
+          "radius": 3
+        }
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "fisher_dock",
+      "displayName": "Fisher Dock",
+      "description": "A pier on the river. Boats bring in fish.",
+      "category": "production",
+      "visualId": "fisher_dock",
+      "iconId": "fisher_dock",
+      "footprint": {
+        "width": 2,
+        "height": 4
+      },
+      "shore": true,
+      "pierCells": 2,
+      "buildCost": [
+        {
+          "currency": "Wood",
+          "amount": 60
+        },
+        {
+          "currency": "Coins",
+          "amount": 200
+        },
+        {
+          "currency": "Tools",
+          "amount": 6
+        }
+      ],
+      "productions": [
+        "fish_small",
+        "fish_medium",
+        "fish_large"
+      ],
+      "movable": true,
+      "rotatable": true,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
+      "id": "road",
+      "displayName": "Road",
+      "description": "Connects buildings to the Town Hall.",
+      "category": "road",
+      "visualId": "road",
+      "iconId": "road",
+      "footprint": {
+        "width": 1,
+        "height": 1
+      },
+      "chain": true,
+      "buildCost": [
+        {
+          "currency": "Coins",
+          "amount": 5
+        }
+      ],
+      "productions": [],
+      "movable": true,
+      "rotatable": false,
+      "buildable": true,
+      "visualLevel": 1
+    },
+    {
       "id": "garden",
       "displayName": "Stone Garden",
       "description": "A raked garden. Neighbours enjoy the view.",
@@ -351,6 +705,10 @@
         {
           "currency": "Coins",
           "amount": 50
+        },
+        {
+          "currency": "Tools",
+          "amount": 2
         }
       ],
       "productions": [],
@@ -385,6 +743,10 @@
         {
           "currency": "Coins",
           "amount": 150
+        },
+        {
+          "currency": "Tools",
+          "amount": 4
         }
       ],
       "productions": [],
@@ -429,14 +791,14 @@
     ]
   },
   "map": {
-    "width": 20,
-    "height": 20,
+    "width": 40,
+    "height": 40,
     "seed": 7,
     "unlocked": {
       "x": 4,
-      "z": 4,
-      "width": 12,
-      "height": 12
+      "z": 3,
+      "width": 14,
+      "height": 13
     },
     "townHall": {
       "buildingId": "town_hall",
@@ -444,26 +806,62 @@
       "z": 10
     },
     "rows": [
-      ".TT.TTTs..T...BTTT~~",
-      "R..RTTTTsTTTB.TTTs~~",
-      "Bs.T....sBBs.RT.g~~T",
-      "Tsg.gTg...RT.TsT~~Ts",
-      "Ts.Ts..gs.....g~~.TT",
-      "Bs..s....g,.g.f~~...",
-      "TTBB..,,..,.,,..~~TT",
-      "TTgB..,...,.f,s.~~..",
-      "BBTT..fs.,,,.g.B~~..",
-      "sTT....g.,,,..f.==,,",
-      "TT.Rf.....,....B~~..",
-      "sT...........s.B~~..",
-      "T.g...,,........~~TT",
-      "TT.TRs.......s..~~TT",
-      "BRT.RC.......g.T~~TR",
-      "TT..TTg.......TT~~.B",
-      "TsTT.T.R...g..gT~~TT",
-      "TTT.g..s.TRTTT.T~~T.",
-      ".TBT.TTTTTsTTT.sR~~T",
-      ".RT.TBRBT..RsTTTT~~s"
+      ".TT.TTTs..T...BTg~~~~.TRRTTBTgTrTBTBTTTT",
+      "R..RTTTTsMMTB.TTg~~~~T..TTTTTTTTRTTBTTTT",
+      "Bs.T....MMMM.RT.s~~~~f.TgTTTTTTTBBTTTTTT",
+      "Tsg.gTgMMMMMMTsT~~~~~..T..g.TgRTT..TTBTT",
+      "Ts.Ts..gs.....g~~~~~srg.TT.T.......BTTTT",
+      "Bs..s....g,.g.f~~~~~.......B.....R.TTTTT",
+      "TTBB..,,..,.,,..~~~~.g.s....TT.T...sTTTT",
+      "TTgB..,...,.f,s.~~~~.s.f...T..T,T.gT.TTB",
+      "BBTT..fs.,,,.g.B~~~~..gs....,,CC.C.f.TTT",
+      "sTT....g.,,,..f.====,,,T,T,,.C....Ts.TTr",
+      "TT.Rf.....,.....~~~~~,T,,,,TT....fssBT.T",
+      "sT...........s..~~~~~..TT..T.Tg.Ts.TRTTT",
+      "T.g...,,........~~~~~..CsCC.gsf..g...sTB",
+      "TT.TRs.......s...~~~~~.gCTT.gg.Ts..TTTTs",
+      "BRT.RC.......g.TT~~~~~.C.CT.g.fg.TBg.TT.",
+      "TT..TTg.......TTs~~~~~.....s...sTsT.BB.B",
+      "TsTT.T.R...g..gT.~~~~~.....rT....gB.Bg.B",
+      "TTT.g..s.TRTTT.T.f~~~~~Tg..r.B...B..BT..",
+      ".TBT.TTTTTsTTT.s.g.~~~~~B.T.s.g...s...TT",
+      ".RT.TBRBT..RsTTTg.rs~~~~~B...g.T.....RT.",
+      "T.TfT..T.,,sTss..T..~~~~~B.T.gTT.Tfs.T..",
+      "T.TT..rg.,,Cs.r...,,======,,.s..TT...BTT",
+      "..TT.Trr.,,,,,,,,,Ts.~~~~~~s...s......T.",
+      "RRT....T.,,...s..g...f~~~~~..~~..TB..Tg.",
+      "TTT...T.C,,.gBT..T.TTs~~~~~~~~~~.gTgTTTT",
+      "TTTT.....,,CBB...rrBT.~~~~~~~~~~~.g.frT.",
+      "TTTT...sT,,T.B.f..s...~~~~~~~~~~~~~~~.gf",
+      "T.T.f.T.f,,.B.T.sT...~~~~~~~~~~~~~~~~~.R",
+      "TTB..g..RT,....TB...~~~~~~~~~~~~~~~~~~~.",
+      "T.TgT..sC.T.......ss~~~~~~~~~~~~~~~~~~~.",
+      "TT.s...T.fgTT...TT..~~~~~~~~~~~~~~~~~~~T",
+      ".RT.T.gTfTTTTTT.T.s..~~~~~~~~~~~~~~~~~T.",
+      "TTT.T.C.gsT.fB.TT.Tg.~~~~~~~~~~~~~~~~~Tg",
+      "BTT.TCCTT.r.B..T.f.Tr~~~~~~~~~~~~~~~~~gT",
+      "TTT..T.TT.RTT.TsTg.r.~~~~~~~~~~~~~~~~~gB",
+      "RTTTT.T..T....gg.TTg..~~~~~~~~~~~~~~T.TT",
+      "TTBTg.sT..rsT.T...TTT.T....~~~~~...T.TT.",
+      "TBBTBTBTT.RTBTT.TTBTB..TT.B..r...TTTTTTT",
+      "TTTTRTTTTR.TTTTRTTTBTTT.T.TBRTTTT.B.TTTR",
+      "TTT.TTTTTTTBssTTT.TTRTTfT.TR.TT.TTg.gTTT"
+    ],
+    "expansions": [
+      {
+        "level": 2,
+        "x": 4,
+        "z": 16,
+        "width": 14,
+        "height": 14
+      },
+      {
+        "level": 3,
+        "x": 20,
+        "z": 4,
+        "width": 14,
+        "height": 19
+      }
     ]
   }
 }

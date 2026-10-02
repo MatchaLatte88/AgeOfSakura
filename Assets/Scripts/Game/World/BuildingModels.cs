@@ -41,7 +41,7 @@ namespace AgeOfSakura.Game
     /// a few meshes (<see cref="ModelBatcher"/>). Everything stays inside the footprint (plus a small margin for shrubs), so neighbouring
     /// buildings and the sakura trees of the world can never clip into a model.
     /// </summary>
-    public sealed class ProceduralBuildingModels : IBuildingModelProvider
+    public sealed partial class ProceduralBuildingModels : IBuildingModelProvider
     {
         private readonly GameArt art;
         private readonly Prim prim;
@@ -63,12 +63,16 @@ namespace AgeOfSakura.Game
                 { "woodcutter", Woodcutter },
                 { "rice_paddy", RicePaddy },
                 { "garden", Garden },
-                { "shrine", Shrine }
+                { "shrine", Shrine },
+                { "blacksmith", Blacksmith },
+                { "fisher_dock", FisherDock },
+                { "mine", Mine },
+                { "road", Road }
             };
         }
 
         /// <summary>Every visualId this provider can build (used by editor-time validation without creating materials).</summary>
-        public static readonly string[] KnownVisualIds = { "town_hall", "house", "woodcutter", "rice_paddy", "garden", "shrine" };
+        public static readonly string[] KnownVisualIds = { "town_hall", "house", "woodcutter", "rice_paddy", "garden", "shrine", "blacksmith", "fisher_dock", "mine", "road" };
 
         public bool Has(string visualId) => builders.ContainsKey(visualId);
 
@@ -77,7 +81,7 @@ namespace AgeOfSakura.Game
             if (!builders.TryGetValue(visualId, out var build)) throw new KeyNotFoundException($"No model for visualId '{visualId}'.");
             var model = build(Mathf.Clamp(visualLevel, 1, 3), footprintWidth, footprintHeight);
             ModelBatcher.Merge(model);
-            model.AddComponent<BuildInAnimation>();
+            if (visualId != "road") model.AddComponent<BuildInAnimation>(); // a flat paving tile just settles into place
             return model;
         }
 

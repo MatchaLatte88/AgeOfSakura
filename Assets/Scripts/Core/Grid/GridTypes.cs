@@ -30,7 +30,9 @@ namespace AgeOfSakura.Core
         Tree,
         Cherry,
         Bamboo,
-        Rock
+        Rock,
+        /// <summary>A mountain: never buildable, but a Mine stands against it.</summary>
+        Mountain
     }
 
     /// <summary>Small removable vegetation on otherwise buildable cells; hidden when a building covers it.</summary>
@@ -49,7 +51,24 @@ namespace AgeOfSakura.Core
         OutOfBounds,
         Locked,
         BlockedTerrain,
-        Occupied
+        Occupied,
+        /// <summary>A shore building needs land under its landward part and water under its pier.</summary>
+        NeedsShore
+    }
+
+    /// <summary>
+    /// Extra placement rule for buildings that are not plain land buildings. A shore building (the Fisher Dock) is laid out along its
+    /// local +Z axis: the first cells are land, the last <see cref="PierCells"/> cells (the pier) must stand in water.
+    /// <see cref="Rotation"/> is the quarter turns of the footprint, so +Z maps to +X, -Z, -X for 1, 2, 3.
+    /// </summary>
+    public sealed class PlacementRule
+    {
+        /// <summary>Cells at the far end that must stand on <see cref="PierTerrain"/> (water for a dock, mountain for a mine); 0 = an ordinary land building.</summary>
+        public int PierCells;
+        public TerrainType PierTerrain = TerrainType.Water;
+        public int Rotation;
+        /// <summary>People may walk over the cells this building covers (roads).</summary>
+        public bool WalkableSurface;
     }
 
     public sealed class GridCell
@@ -61,6 +80,9 @@ namespace AgeOfSakura.Core
 
         /// <summary>Stable instance ID of the building covering this cell, or null.</summary>
         public string OccupantId { get; internal set; }
+
+        /// <summary>The building on this cell is a road: it still counts as occupied, but villagers and animals walk over it.</summary>
+        public bool WalkableOccupant { get; internal set; }
 
         public GridCell(GridPos pos)
         {
@@ -80,7 +102,7 @@ namespace AgeOfSakura.Core
         {
             get
             {
-                if (IsOccupied) return false;
+                if (IsOccupied && !WalkableOccupant) return false;
                 return Terrain == TerrainType.Grass || Terrain == TerrainType.Dirt || Terrain == TerrainType.Bridge;
             }
         }

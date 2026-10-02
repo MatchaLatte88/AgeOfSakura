@@ -13,7 +13,11 @@ namespace AgeOfSakura.Core
         CollectTaxes,
         /// <summary>A house needs more of <see cref="Goal.Need"/>: <see cref="Goal.Value"/> now, <see cref="Goal.Target"/> wanted.</summary>
         ImproveNeed,
-        UpgradeHouse
+        UpgradeHouse,
+        /// <summary>Tools are missing for the next step: build the Blacksmith, then forge.</summary>
+        ForgeTools,
+        /// <summary>The houses want Fish: build the Fisher Dock, then start a catch.</summary>
+        CatchFish
     }
 
     public sealed class Goal
@@ -37,6 +41,9 @@ namespace AgeOfSakura.Core
         public const string WoodcutterId = "woodcutter";
         public const string RicePaddyId = "rice_paddy";
         public const string HouseId = "house";
+        public const string BlacksmithId = "blacksmith";
+        public const string FisherDockId = "fisher_dock";
+        public const string MineId = "mine";
 
         public static Goal Next(GameSession session)
         {
@@ -72,7 +79,15 @@ namespace AgeOfSakura.Core
             foreach (var cost in upgrade.Cost)
             {
                 long have = session.Wallet.GetBalance(cost.Currency);
-                if (have < cost.Amount) return new Goal { Kind = GoalKind.Gather, BuildingId = HouseId, Currency = cost.Currency, Amount = cost.Amount - have, Level = upgrade.NextLevel };
+                if (have >= cost.Amount) continue;
+                if (cost.Currency == CurrencyType.Tools)
+                {
+                    if (session.Definitions.TryGetBuilding(BlacksmithId, out var smith) && !Owns(session, BlacksmithId)) return BuildOrGather(session, smith);
+                    // the smith stands but has no iron to forge: the mine comes first
+                    if (session.Wallet.GetBalance(CurrencyType.Iron) < 2 && session.Definitions.TryGetBuilding(MineId, out var mine) && !Owns(session, MineId)) return BuildOrGather(session, mine);
+                    return new Goal { Kind = GoalKind.ForgeTools, BuildingId = BlacksmithId, Currency = cost.Currency, Amount = cost.Amount - have, Level = upgrade.NextLevel };
+                }
+                return new Goal { Kind = GoalKind.Gather, BuildingId = HouseId, Currency = cost.Currency, Amount = cost.Amount - have, Level = upgrade.NextLevel };
             }
             return new Goal { Kind = GoalKind.None };
         }
@@ -84,19 +99,25 @@ namespace AgeOfSakura.Core
                 case ProductionState.ReadyToCollect:
                     return new Goal { Kind = GoalKind.CollectTaxes, BuildingId = HouseId };
                 case ProductionState.Idle:
-                    return RiceOnHand(session, house) ? new Goal { Kind = GoalKind.StartTaxes, BuildingId = HouseId } : new Goal { Kind = GoalKind.HarvestRice, BuildingId = RicePaddyId };
+                    var missing = MissingInput(session, house);
+                    if (missing == null) return new Goal { Kind = GoalKind.StartTaxes, BuildingId = HouseId };
+                    if (missing.Value == CurrencyType.Fish) return new Goal { Kind = GoalKind.CatchFish, BuildingId = FisherDockId };
+                    return new Goal { Kind = GoalKind.HarvestRice, BuildingId = RicePaddyId };
                 default:
                     return new Goal { Kind = GoalKind.ImproveNeed, Need = NeedType.Served, Value = need.Current, Target = need.Requirement.Min };
             }
         }
 
-        private static bool RiceOnHand(GameSession session, BuildingInstance house)
+        /// <summary>The first good the house's tax run lacks, or null when everything is on hand.</summary>
+        private static CurrencyType? MissingInput(GameSession session, BuildingInstance house)
         {
             var def = session.Buildings.GetDefinition(house);
             var ids = def.GetProductionIds(house.Level);
-            if (ids.Count == 0) return true;
+            if (ids.Count == 0) return null;
             var production = session.Definitions.GetProduction(ids[0]);
-            return session.Wallet.CanAfford(production.Inputs);
+            foreach (var input in production.Inputs)
+                if (!session.Wallet.CanAfford(input.Currency, input.Amount)) return input.Currency;
+            return null;
         }
 
         private static Goal BuildOrGather(GameSession session, BuildingDefinition def)

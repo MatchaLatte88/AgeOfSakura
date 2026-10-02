@@ -39,17 +39,28 @@ namespace AgeOfSakura.Game
             yield return Vegetation();
         }
 
-        /// <summary>Photographs one building model at all three looks, whole and in close-ups of the two faces the camera sees.</summary>
-        public IEnumerator RunBuilding(string visualId)
+        /// <summary>
+        /// Photographs one building model at its looks, whole and in close-ups of the two faces the camera sees. A building that stands in
+        /// the river (the dock) gets a patch of water on the far half of the lawn.
+        /// </summary>
+        public IEnumerator RunBuilding(string visualId, int levels = 3, float ortho = 1.15f, bool pierInWater = false)
         {
             BuildStage();
-            for (int level = 1; level <= 3; level++)
+            if (pierInWater)
+            {
+                var water = new GameObject("Water");
+                water.transform.SetParent(stage, false);
+                water.transform.position = stageOrigin + new Vector3(-9f, 0.045f, 0f);
+                water.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.GroundQuad(18f, 9f);
+                water.AddComponent<MeshRenderer>().sharedMaterial = ctx.Art.NoOutline(Palette.WaterShallow);
+            }
+            for (int level = 1; level <= levels; level++)
             {
                 var model = ctx.Models.Create(visualId, level, 2, 2);
                 model.transform.SetParent(stage, false);
                 model.transform.position = At(0f, 0f);
-                yield return Photo($"{visualId}_l{level}", At(0f, 0f) + Vector3.up * 0.55f, 1.15f);
-                if (level == 2)
+                yield return Photo($"{visualId}_l{level}", At(0f, 0f) + Vector3.up * 0.55f, ortho);
+                if (level == 2 || levels == 1)
                 {
                     yield return Photo($"{visualId}_l2_front", At(0f, 0f) + Right * 0.1f + Away * -0.5f + Vector3.up * 0.4f, 0.62f);
                     yield return Photo($"{visualId}_l2_left", At(0f, 0f) + Right * -0.6f + Away * 0.1f + Vector3.up * 0.4f, 0.62f);
@@ -57,6 +68,48 @@ namespace AgeOfSakura.Game
                 }
                 UnityEngine.Object.Destroy(model);
             }
+        }
+
+        /// <summary>Road paving in every shape that matters: single cell, straight, corner, T and crossing, next to each other.</summary>
+        public IEnumerator RunRoads()
+        {
+            BuildStage();
+            var masks = new[]
+            {
+                0, RoadSurface.East, RoadSurface.East | RoadSurface.West,
+                RoadSurface.East | RoadSurface.North, RoadSurface.East | RoadSurface.West | RoadSurface.North,
+                RoadSurface.East | RoadSurface.West | RoadSurface.North | RoadSurface.South
+            };
+            for (int i = 0; i < masks.Length; i++)
+            {
+                var model = ctx.Models.Create("road", 1, 1, 1);
+                model.transform.SetParent(stage, false);
+                model.transform.position = At((i - 2.5f) * 1.6f, 0f);
+                model.GetComponentInChildren<RoadSurface>().SetMask(masks[i]);
+            }
+            // a longer run laid cell by cell, bending twice
+            var run = new[] { (0, 0, 9), (1, 0, 13), (2, 0, 5), (2, 1, 10), (2, 2, 3), (3, 2, 5), (4, 2, 5) };
+            foreach (var (x, z, mask) in run)
+            {
+                var model = ctx.Models.Create("road", 1, 1, 1);
+                model.transform.SetParent(stage, false);
+                model.transform.position = At(-1.5f + x, 2.5f + z);
+                model.GetComponentInChildren<RoadSurface>().SetMask(mask);
+            }
+            yield return Photo("roads_a", At(0f, 1.2f), 2.6f);
+            yield return Photo("roads_close", At(-0.8f, 0f), 1.1f);
+        }
+
+        /// <summary>The whole world and its four quarters (valley, east bank, southern meadow, lake) from the game's own angle.</summary>
+        public IEnumerator RunWorld()
+        {
+            var grid = ctx.Session.Grid;
+            float w = grid.Width * grid.CellSize, h = grid.Height * grid.CellSize;
+            yield return Photo("world_all", new Vector3(w * 0.5f, 0f, h * 0.5f), Mathf.Max(w, h) * 0.52f);
+            yield return Photo("world_valley", new Vector3(11f, 0f, 10f), 9f);
+            yield return Photo("world_east", new Vector3(27f, 0f, 12f), 9f);
+            yield return Photo("world_south", new Vector3(10f, 0f, 26f), 9f);
+            yield return Photo("world_lake", new Vector3(28f, 0f, 29f), 10f);
         }
 
         private void BuildStage()

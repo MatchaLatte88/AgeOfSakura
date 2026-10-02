@@ -33,6 +33,7 @@ namespace AgeOfSakura.Game
             this.cameraRotation = cameraRotation;
 
             foreach (var b in session.Buildings.All) CreateView(b, animate: false);
+            foreach (var b in session.Buildings.All) if (IsRoad(b)) RefreshRoadsAround(b.Origin);
 
             session.Buildings.BuildingPlaced += OnPlaced;
             session.Buildings.BuildingMoved += OnMoved;
@@ -88,6 +89,39 @@ namespace AgeOfSakura.Game
             view.ApplyPlacement(instance, session.Buildings.GetDefinition(instance), session.Grid);
             view.PlaySettle();
             vfx.PlayDust(view.transform.position, 0.8f);
+            if (IsRoad(instance)) RefreshRoadsAround(oldOrigin);
+            RefreshRoadsAround(instance.Origin);
+        }
+
+        // ------------------------------------------------------------------ roads: every paving tile follows its neighbours
+
+        private bool IsRoad(BuildingInstance instance) => session.Buildings.GetDefinition(instance).Category == RoadNetwork.RoadCategory;
+
+        private static readonly (int dx, int dz, int bit)[] RoadDirections =
+        {
+            (1, 0, RoadSurface.East), (0, 1, RoadSurface.North), (-1, 0, RoadSurface.West), (0, -1, RoadSurface.South)
+        };
+
+        /// <summary>Re-shapes the road on a cell and on its four neighbours (after a road was placed, moved or a hall/bridge appeared next to it).</summary>
+        private void RefreshRoadsAround(GridPos pos)
+        {
+            RefreshRoad(pos.X, pos.Z);
+            foreach (var (dx, dz, _) in RoadDirections) RefreshRoad(pos.X + dx, pos.Z + dz);
+        }
+
+        private void RefreshRoad(int x, int z)
+        {
+            if (!session.Grid.TryGetCell(x, z, out var cell) || cell.OccupantId == null) return;
+            if (!views.TryGetValue(cell.OccupantId, out var view) || !session.Buildings.TryGet(cell.OccupantId, out var instance) || !IsRoad(instance)) return;
+            int mask = 0;
+            foreach (var (dx, dz, bit) in RoadDirections)
+            {
+                if (!session.Grid.TryGetCell(x + dx, z + dz, out var next)) continue;
+                bool connects = session.Housing.Roads.IsRoad(next);
+                if (!connects && next.OccupantId != null && session.Buildings.TryGet(next.OccupantId, out var other)) connects = other.DefinitionId == session.Definitions.Map.TownHallId;
+                if (connects) mask |= bit;
+            }
+            view.SetRoadMask(mask);
         }
 
         private BuildingView CreateView(BuildingInstance instance, bool animate)
@@ -96,6 +130,7 @@ namespace AgeOfSakura.Game
             var view = BuildingView.Create(instance, def, session.Grid, art, prim, models, vfx, cameraRotation, world.BuildingsRoot);
             views[instance.InstanceId] = view;
             RefreshIndicator(instance);
+            if (IsRoad(instance)) RefreshRoadsAround(instance.Origin);
             if (animate) view.PlayBuildIn();
             ViewCreated?.Invoke(view);
             return view;

@@ -43,6 +43,8 @@ namespace AgeOfSakura.Core
 
         public event Action<BuildingInstance> BuildingUpgraded;
 
+        public RoadNetwork Roads { get; }
+
         public HousingService(GameDefinitions defs, BuildingService buildings, GridMap grid, Wallet wallet, IAnalyticsService analytics)
         {
             this.defs = defs;
@@ -50,6 +52,17 @@ namespace AgeOfSakura.Core
             this.grid = grid;
             this.wallet = wallet;
             this.analytics = analytics;
+            Roads = new RoadNetwork(defs, buildings, grid);
+        }
+
+        /// <summary>Opens the land the Town Hall's current level has earned (idempotent). Called after loading and after every upgrade.</summary>
+        public int ApplyExpansions()
+        {
+            int hallLevel = 0;
+            foreach (var b in buildings.All) if (b.DefinitionId == defs.Map.TownHallId) hallLevel = Math.Max(hallLevel, b.Level);
+            int unlocked = 0;
+            foreach (var e in defs.Map.Expansions) if (hallLevel >= e.Level) unlocked += grid.UnlockRect(e.X, e.Z, e.Width, e.Height);
+            return unlocked;
         }
 
         public bool IsUpgradable(BuildingInstance instance) => buildings.GetDefinition(instance).Levels.Count > 0;
@@ -101,6 +114,7 @@ namespace AgeOfSakura.Core
         public float GetNeedValue(BuildingInstance instance, NeedRequirement need)
         {
             if (need.Type == NeedType.Served) return instance.CyclesAtLevel;
+            if (need.Type == NeedType.Connected) return Roads.IsConnected(instance) ? 1f : 0f;
             need.TryGetVariable(out var variable);
             return GetEnvironment(instance, variable);
         }
@@ -145,6 +159,7 @@ namespace AgeOfSakura.Core
                 throw new InvalidOperationException("Wallet rejected a cost that CanAfford accepted.");
             instance.Level = info.NextLevel;
             instance.CyclesAtLevel = 0;
+            ApplyExpansions();
             GameLog.Info(LogCategory.Building, $"Upgraded {instance.DefinitionId} {instance.InstanceId} to level {instance.Level}");
             analytics.Track(AnalyticsEvents.BuildingUpgraded, new Dictionary<string, object> { { "building", instance.DefinitionId }, { "level", instance.Level } });
             BuildingUpgraded?.Invoke(instance);

@@ -95,12 +95,13 @@ namespace AgeOfSakura.Game
             Directory.CreateDirectory(options.OutputDirectory);
             yield return new WaitForSecondsRealtime(1.0f);
             // screenshots must not catch buildings half-way through their construction animation (the "buildin" walkthrough does on purpose)
-            BuildInAnimation.SpeedMultiplier = options.States == "galleryhouse" || options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" || options.States == "house" ? 1000f : 1f;
+            BuildInAnimation.SpeedMultiplier = options.States == "galleryhouse" || options.States.StartsWith("gallery_") || options.States == "dockboat" || options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" || options.States == "house" ? 1000f : 1f;
             if (options.States == "game") PrepareGameplayWorld();
             else if (options.States == "style") PrepareStyleWorld();
             else if (options.States == "hall") PrepareHallWorld();
             else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") PrepareSingleBuildingWorld();
-            else if (options.States == "gallery" || options.States == "galleryhouse") { }
+            else if (options.States == "dockboat") PrepareDockWorld();
+            else if (options.States == "gallery" || options.States.StartsWith("gallery_") || options.States == "galleryhouse") { }
             else PrepareWorld();
 
             foreach (var res in options.Resolutions)
@@ -114,6 +115,12 @@ namespace AgeOfSakura.Game
                 else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") yield return RunSingleBuilding();
                 else if (options.States == "gallery") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).Run();
                 else if (options.States == "galleryhouse") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunBuilding("house");
+                else if (options.States == "gallery_blacksmith") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunBuilding("blacksmith", 3, 1.25f);
+                else if (options.States == "gallery_dock") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunBuilding("fisher_dock", 1, 2.1f, true);
+                else if (options.States == "gallery_mine") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunBuilding("mine", 1, 2.0f);
+                else if (options.States == "gallery_roads") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunRoads();
+                else if (options.States == "gallery_world") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunWorld();
+                else if (options.States == "dockboat") yield return RunDockBoat();
                 else yield return RunStates();
             }
 
@@ -201,6 +208,35 @@ namespace AgeOfSakura.Game
             }
             yield return CloseUp(centre, 3.2f);
             yield return Shot($"{prefix}3_wide", 0.6f);
+        }
+
+        // ------------------------------------------------------------------ river life: a dock catching fish, with its boat
+
+        private string dockId;
+
+        private void PrepareDockWorld()
+        {
+            var s = ctx.Session;
+            s.Wallet.Restore(new Dictionary<CurrencyType, long> { { CurrencyType.Coins, 2000 }, { CurrencyType.Wood, 400 }, { CurrencyType.Tools, 40 }, { CurrencyType.Diamonds, 18 } });
+            dockId = s.Buildings.PlaceFree("fisher_dock", new GridPos(14, 6), 1).InstanceId;
+            s.Buildings.PlaceFree("blacksmith", new GridPos(6, 5), 0);
+            s.Buildings.PlaceFree("mine", new GridPos(8, 3), 2);
+            // a short road from the hall and one into the east: shows the paving following its neighbours
+            foreach (var (x, z) in new[] { (8, 9), (8, 10), (7, 10), (6, 10), (5, 10), (5, 11), (5, 12) }) s.Buildings.PlaceFree("road", new GridPos(x, z), 0);
+            s.Buildings.PlaceFree("house", new GridPos(6, 12), 0);
+            s.Production.TryStart(dockId, "fish_large");
+        }
+
+        private IEnumerator RunDockBoat()
+        {
+            ctx.Ui.CloseAllPanels();
+            var centre = new Vector3(12f, 0f, 6f);
+            yield return CloseUp(centre, 4.2f);
+            yield return Shot("dock_a", 2.5f);
+            yield return Shot("dock_b", 4f);
+            yield return Shot("dock_c", 5f);
+            yield return CloseUp(new Vector3(7f, 0f, 10.5f), 3.4f);
+            yield return Shot("roads_world", 0.8f);
         }
 
         private void PrepareHallWorld()

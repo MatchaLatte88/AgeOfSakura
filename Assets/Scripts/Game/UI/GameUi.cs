@@ -190,7 +190,7 @@ namespace AgeOfSakura.Game
             };
             placement.StateChanged += ApplyMode;
             placement.Refused += message => Toast.Show(message);
-            placement.BuildingPlaced += instance => selection.Select(instance.InstanceId);
+            placement.BuildingPlaced += instance => { if (!session.Buildings.GetDefinition(instance).Chain) selection.Select(instance.InstanceId); };
 
             session.Wallet.CurrencyChanged += _ =>
             {

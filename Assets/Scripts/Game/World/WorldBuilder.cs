@@ -83,12 +83,11 @@ namespace AgeOfSakura.Game
             var staticRoot = new GameObject("Decor_Static").transform;
             staticRoot.SetParent(root, false);
 
-            BuildCellDecor(liveRoot, staticRoot, grid, view.Cosmetics, rng);
-            BuildShore(liveRoot, staticRoot, grid, view.Cosmetics, rng);
+            BuildCellDecor(liveRoot, staticRoot, grid, map, view.Cosmetics, rng);
+            BuildShore(liveRoot, staticRoot, grid, map, view.Cosmetics, rng);
             props.MaxRadius = float.PositiveInfinity;
             props.AnimateProps = false;
             BuildBridges(staticRoot, grid);
-            BuildBoundary(staticRoot, grid);
             BuildLandmarks(staticRoot, grid, rng);
             BuildHills(staticRoot, grid, rng);
             props.AnimateProps = true;
@@ -98,6 +97,16 @@ namespace AgeOfSakura.Game
             var buildings = new GameObject("Buildings").transform;
             buildings.SetParent(root, false);
             view.BuildingsRoot = buildings;
+
+            // the boundary posts follow the edge of the open land, so they are rebuilt whenever the Town Hall opens more of it
+            var boundary = new GameObject("Boundary").transform;
+            boundary.SetParent(root, false);
+            RebuildBoundary(boundary, grid);
+            grid.LandUnlocked += () =>
+            {
+                view.Locked.Refresh();
+                RebuildBoundary(boundary, grid);
+            };
 
             view.Cosmetics.Refresh(grid);
             grid.OccupancyChanged += () => view.Cosmetics.Refresh(grid);
@@ -190,21 +199,21 @@ namespace AgeOfSakura.Game
             return sun;
         }
 
-        private void BuildCellDecor(Transform liveRoot, Transform staticRoot, GridMap grid, CosmeticRegistry cosmetics, System.Random rng)
+        private void BuildCellDecor(Transform liveRoot, Transform staticRoot, GridMap grid, MapDefinition map, CosmeticRegistry cosmetics, System.Random rng)
         {
             for (int x = 0; x < grid.Width; x++)
             {
                 for (int z = 0; z < grid.Height; z++)
                 {
                     var cell = grid.GetCell(x, z);
-                    bool near = cell.Unlocked;
+                    bool near = cell.Unlocked || WillOpen(map, x, z);
                     var parent = near ? liveRoot : staticRoot;
                     props.AnimateProps = near;
                     var center = CellCenter(grid, x, z);
                     var jitter = new Vector3((float)(rng.NextDouble() - 0.5) * 0.4f, 0f, (float)(rng.NextDouble() - 0.5) * 0.4f);
                     // scenery next to buildable land must stay inside its own cell: buildings stay inside their footprint, so then nothing
                     // (crowns, boulders, bamboo) can ever clip a house, however the player builds
-                    bool compact = NextToBuildableLand(grid, x, z);
+                    bool compact = NextToBuildableLand(grid, map, x, z);
                     props.MaxRadius = compact ? 0.47f : float.PositiveInfinity;
                     if (compact) jitter *= 0.2f;
                     switch (cell.Terrain)
@@ -225,6 +234,10 @@ namespace AgeOfSakura.Game
                         case TerrainType.Rock:
                             props.Rock(parent, center, rng, true);
                             break;
+                        case TerrainType.Mountain:
+                            props.MaxRadius = float.PositiveInfinity;
+                            cosmetics.Add(cell.Pos, props.MountainRock(parent, center, rng, MountainHeight(grid, x, z)));
+                            break;
                         case TerrainType.Grass:
                         case TerrainType.Dirt:
                             AddCosmetic(parent, cosmetics, cell, center + jitter * 0.6f, rng);
@@ -234,20 +247,38 @@ namespace AgeOfSakura.Game
             }
         }
 
-        private static bool NextToBuildableLand(GridMap grid, int x, int z)
+        /// <summary>Mountain cells rise toward the middle of the range: one more neighbour in the rock, one more step of height.</summary>
+        private static float MountainHeight(GridMap grid, int x, int z)
+        {
+            int around = 0;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                    if ((dx != 0 || dz != 0) && grid.TryGetCell(x + dx, z + dz, out var c) && c.Terrain == TerrainType.Mountain) around++;
+            return 0.9f + around * 0.28f;
+        }
+
+        /// <summary>Land that is closed now but opens at some Town Hall level.</summary>
+        private static bool WillOpen(MapDefinition map, int x, int z)
+        {
+            foreach (var e in map.Expansions)
+                if (x >= e.X && x < e.X + e.Width && z >= e.Z && z < e.Z + e.Height) return true;
+            return false;
+        }
+
+        private static bool NextToBuildableLand(GridMap grid, MapDefinition map, int x, int z)
         {
             for (int dx = -1; dx <= 1; dx++)
             {
                 for (int dz = -1; dz <= 1; dz++)
                 {
-                    if (grid.TryGetCell(x + dx, z + dz, out var c) && c.Unlocked && c.TerrainBuildable) return true;
+                    if (grid.TryGetCell(x + dx, z + dz, out var c) && (c.Unlocked || WillOpen(map, x + dx, z + dz)) && c.TerrainBuildable) return true;
                 }
             }
             return false;
         }
 
         /// <summary>Shore detail: rocks and cattails along the banks, lily pads on the water (all near scenery hides under buildings like other cosmetics).</summary>
-        private void BuildShore(Transform liveRoot, Transform staticRoot, GridMap grid, CosmeticRegistry cosmetics, System.Random rng)
+        private void BuildShore(Transform liveRoot, Transform staticRoot, GridMap grid, MapDefinition map, CosmeticRegistry cosmetics, System.Random rng)
         {
             props.MaxRadius = float.PositiveInfinity;
             var dirs = new[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
@@ -257,7 +288,7 @@ namespace AgeOfSakura.Game
                 {
                     var cell = grid.GetCell(x, z);
                     if (cell.Terrain != TerrainType.Water || NearBridge(grid, x, z)) continue;
-                    var parent = cell.Unlocked || NextToBuildableLand(grid, x, z) ? liveRoot : staticRoot;
+                    var parent = cell.Unlocked || NextToBuildableLand(grid, map, x, z) ? liveRoot : staticRoot;
                     props.AnimateProps = parent == liveRoot;
                     var center = CellCenter(grid, x, z);
 
@@ -332,6 +363,14 @@ namespace AgeOfSakura.Game
             }
         }
 
+        private void RebuildBoundary(Transform parent, GridMap grid)
+        {
+            for (int i = parent.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(parent.GetChild(i).gameObject);
+            props.AnimateProps = false;
+            props.MaxRadius = float.PositiveInfinity;
+            BuildBoundary(parent, grid);
+        }
+
         /// <summary>Wooden posts and rope marking the edge of the unlocked area (only where the ground is open).</summary>
         private void BuildBoundary(Transform parent, GridMap grid)
         {
@@ -373,11 +412,15 @@ namespace AgeOfSakura.Game
         {
             // Candidate cells are checked against the map; a candidate that is not open ground is skipped (and reported).
             PlaceLandmark(grid, new[] { (2, 10), (1, 11), (3, 9), (2, 8) }, "torii", pos => props.Torii(parent, pos, 90f));
-            PlaceLandmark(grid, new[] { (18, 10), (18, 8), (19, 9) }, "bridge lantern", pos => props.StoneLantern(parent, pos));
-            PlaceLandmark(grid, new[] { (18, 8), (19, 10), (18, 10) }, "bridge lantern 2", pos => props.StoneLantern(parent, pos));
+            PlaceLandmark(grid, new[] { (21, 8), (22, 8), (21, 7) }, "bridge lantern", pos => props.StoneLantern(parent, pos));
+            PlaceLandmark(grid, new[] { (21, 11), (22, 11), (21, 12) }, "bridge lantern 2", pos => props.StoneLantern(parent, pos));
+            PlaceLandmark(grid, new[] { (26, 10), (27, 11), (25, 11) }, "east lantern", pos => props.StoneLantern(parent, pos));
+            PlaceLandmark(grid, new[] { (9, 30), (10, 31), (8, 30), (11, 30) }, "south torii", pos => props.Torii(parent, pos, 0f));
+            PlaceLandmark(grid, new[] { (5, 24), (6, 24), (4, 25) }, "south log pile", pos => props.LogPile(parent, pos, rng));
+            PlaceLandmark(grid, new[] { (12, 25), (13, 26), (14, 25) }, "south signboard", pos => props.Signboard(parent, pos, 20f));
             PlaceLandmark(grid, new[] { (2, 5), (2, 6), (3, 3), (5, 2) }, "log pile", pos => props.LogPile(parent, pos, rng));
             PlaceLandmark(grid, new[] { (3, 2), (4, 1), (2, 2) }, "fence", pos => props.Fence(parent, pos, 1.6f, 20f));
-            PlaceLandmark(grid, new[] { (18, 15), (19, 11), (18, 11) }, "well", pos => props.Well(parent, pos, rng));
+            PlaceLandmark(grid, new[] { (22, 14), (23, 14), (22, 15), (24, 15) }, "well", pos => props.Well(parent, pos, rng));
             PlaceLandmark(grid, new[] { (2, 13), (3, 14), (2, 15), (1, 12) }, "signboard", pos => props.Signboard(parent, pos, 45f));
             PlaceLandmark(grid, new[] { (3, 17), (4, 16), (2, 16), (3, 15) }, "barrels", pos => { props.Barrel(parent, pos, rng); props.Crate(parent, pos + new Vector3(0.4f, 0f, 0.1f), rng); });
             PlaceLandmark(grid, new[] { (15, 2), (16, 2), (14, 3), (12, 3) }, "stone wall", pos => props.StoneWall(parent, pos, 1.4f, -25f));
@@ -400,11 +443,13 @@ namespace AgeOfSakura.Game
         {
             float cx = grid.Width * grid.CellSize * 0.5f;
             float cz = grid.Height * grid.CellSize * 0.5f;
-            int count = 26;
+            // the ring starts just outside the corners of the map (half the diagonal) and grows with its circumference
+            float halfDiagonal = Mathf.Sqrt(cx * cx + cz * cz);
+            int count = Mathf.RoundToInt(26f * halfDiagonal / 14.1f);
             for (int i = 0; i < count; i++)
             {
                 float angle = (float)i / count * Mathf.PI * 2f + (float)rng.NextDouble() * 0.2f;
-                float dist = 16.5f + (float)rng.NextDouble() * 9f;
+                float dist = halfDiagonal + 2.4f + (float)rng.NextDouble() * 9f;
                 float radius = 3f + (float)rng.NextDouble() * 3f;
                 float height = 1.4f + (float)rng.NextDouble() * 2.2f;
                 var pos = new Vector3(cx + Mathf.Cos(angle) * dist, 0f, cz + Mathf.Sin(angle) * dist);

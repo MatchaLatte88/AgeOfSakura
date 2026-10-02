@@ -238,7 +238,7 @@ namespace AgeOfSakura.Game
 
         private string EnvIcon(EnvironmentVariable variable) => variable.ToString().ToLowerInvariant();
 
-        private string NeedIcon(NeedType type) => type == NeedType.Served ? "rice" : type.ToString().ToLowerInvariant();
+        private string NeedIcon(NeedType type) => type == NeedType.Served ? "rice" : type == NeedType.Connected ? "road" : type.ToString().ToLowerInvariant();
 
         private void ProductionSelection(RectTransform body, BuildingInstance instance, BuildingDefinition def, UpgradeInfo upgrade)
         {

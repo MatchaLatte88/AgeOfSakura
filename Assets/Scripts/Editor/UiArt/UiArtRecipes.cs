@@ -37,6 +37,13 @@ namespace AgeOfSakura.EditorTools.UiArt
             yield return Icon("woodcutter", Woodcutter);
             yield return Icon("town_hall", TownHall);
             yield return Icon("rice", Rice);
+            yield return Icon("tools", Tools);
+            yield return Icon("iron", Iron);
+            yield return Icon("mine", Mine);
+            yield return Icon("fish", Fish);
+            yield return Icon("blacksmith", Blacksmith);
+            yield return Icon("fisher_dock", FisherDock);
+            yield return Icon("road", Road);
             yield return Icon("rice_paddy", RicePaddy);
             yield return Icon("garden", Garden);
             yield return Icon("shrine", Shrine);
@@ -270,6 +277,180 @@ namespace AgeOfSakura.EditorTools.UiArt
                 c.Fill(Sd.Capsule(xl, y, xr, y, 1.7f), Sh.Solid(Pal.A(Pal.WoodDeep, 0.28f)));
             }
             c.Fill(Sd.Polyline(P(24, 116, 128, 218), 3), Sh.Solid(new Color(1, 1, 1, 0.35f)));
+            return c.ToTexture();
+        }
+
+        /// <summary>Currency "Tools": a hammer and a spanner crossed.</summary>
+        private static Texture2D Tools()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            // spanner from the lower left to an open-jawed head at the upper right
+            var spannerHandle = Sd.Capsule(62, 60, 158, 156, 14);
+            var jawRing = Sd.Circle(180, 178, 40);
+            var jawSlot = Sd.Rotate(Sd.Box(206, 204, 26, 15, 3), 180, 178, Mathf.PI * 0.25f);
+            var spannerHead = Sd.Sub(jawRing, jawSlot);
+            // hammer from the lower right to a head at the upper left
+            var hammerHandle = Sd.Capsule(196, 62, 104, 152, 13);
+            var hammerHead = Sd.Rotate(Sd.Box(94, 164, 50, 25, 8), 94, 164, Mathf.PI * 0.25f);
+            c.Shadow(Sd.Union(spannerHandle, spannerHead, hammerHandle, hammerHead), 3, -9, 14, 0.38f);
+            c.Outlined(spannerHandle, Pal.Outline, 7, Sh.Linear(60, 60, 160, 160, H("#F6F9FB"), H("#7B8996")));
+            c.Outlined(spannerHead, Pal.Outline, 7, Sh.Linear(150, 140, 212, 214, H("#F6F9FB"), H("#75838F")));
+            c.Outlined(hammerHandle, Pal.Outline, 7, Sh.Linear(196, 62, 104, 152, H("#EDBE80"), H("#8A5A2E")));
+            c.Outlined(hammerHead, Pal.Outline, 7, Sh.Linear(60, 200, 130, 130, H("#8E9AA6"), H("#3F4B57")));
+            c.Fill(Sd.Capsule(70, 82, 140, 148, 2.6f), Sh.Solid(new Color(1, 1, 1, 0.5f)));
+            Sparkle(c, 214, 70, 20, 0.9f);
+            return c.ToTexture();
+        }
+
+        /// <summary>Currency "Iron": a small stack of ingots.</summary>
+        private static Texture2D Iron()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            Sdf Ingot(float cx, float cy) => Sd.Poly(P(cx - 74, cy - 28, cx + 74, cy - 28, cx + 56, cy + 28, cx - 56, cy + 28), 8);
+            var spots = new[] { new Vector2(78, 70), new Vector2(178, 70), new Vector2(128, 132) };
+            var all = new Sdf[spots.Length];
+            for (int i = 0; i < spots.Length; i++) all[i] = Ingot(spots[i].x, spots[i].y);
+            c.Shadow(Sd.Union(all), 3, -9, 14, 0.38f);
+            for (int i = 0; i < spots.Length; i++)
+            {
+                var s = spots[i];
+                c.Outlined(all[i], Pal.Outline, 7, Sh.V(s.y + 28, s.y - 28, H("#C9D3DC"), H("#5F6C78")));
+                c.Fill(Sd.Capsule(s.x - 44, s.y + 16, s.x + 40, s.y + 16, 3), Sh.Solid(new Color(1, 1, 1, 0.7f)));
+                c.Fill(Sd.Capsule(s.x - 56, s.y - 14, s.x + 56, s.y - 14, 2.4f), Sh.Solid(Pal.A(H("#37424D"), 0.45f)));
+            }
+            Sparkle(c, 214, 190, 24, 0.95f);
+            return c.ToTexture();
+        }
+
+        /// <summary>Building "Mine": a timbered tunnel mouth in a rocky mountain, with an ore cart.</summary>
+        private static Texture2D Mine()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            var mountain = Sd.Poly(P(10, 28, 246, 28, 200, 150, 150, 232, 106, 176, 60, 196), 14);
+            c.Shadow(mountain, 3, -9, 14, 0.38f);
+            c.Outlined(mountain, Pal.Outline, 7, Sh.V(232, 28, H("#C3C8CE"), H("#6E7681")));
+            c.Fill(Sd.Capsule(76, 170, 146, 214, 3), Sh.Solid(new Color(1, 1, 1, 0.45f)));
+            c.Fill(Sd.Capsule(60, 120, 100, 150, 3), Sh.Solid(Pal.A(Color.black, 0.15f)));
+            var hole = Sd.Poly(P(86, 38, 170, 38, 170, 108, 128, 136, 86, 108), 6);
+            c.Outlined(hole, Pal.Outline, 6, Sh.V(136, 38, H("#2B2420"), H("#0E0A08")));
+            foreach (float px in new[] { 82f, 174f }) c.Outlined(Sd.Capsule(px, 36, px, 112, 7), Pal.Outline, 5, Sh.Linear(px - 7, 70, px + 7, 70, H("#C28A4F"), H("#6B431F")));
+            c.Outlined(Sd.Box(128, 118, 56, 8, 3), Pal.Outline, 5, Sh.V(126, 110, H("#C28A4F"), H("#6B431F")));
+            // ore cart on rails
+            c.Fill(Sd.Capsule(30, 30, 226, 30, 3), Sh.Solid(Pal.A(Pal.Outline, 0.8f)));
+            var cart = Sd.Poly(P(104, 70, 152, 70, 146, 44, 110, 44), 4);
+            c.Outlined(cart, Pal.Outline, 5, Sh.V(70, 44, H("#9A6A40"), H("#4C2F19")));
+            c.Fill(Sd.Ellipse(128, 72, 24, 8), Sh.V(80, 64, H("#E3A33A"), H("#B46A20")));
+            foreach (float wx in new[] { 114f, 142f }) c.Outlined(Sd.Circle(wx, 38, 8), Pal.Outline, 3, Sh.Solid(H("#6D7782")));
+            Sparkle(c, 200, 190, 18, 0.9f);
+            return c.ToTexture();
+        }
+
+        /// <summary>Currency "Fish": a plump river fish with a forked tail.</summary>
+        private static Texture2D Fish()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            var body = Sd.Ellipse(112, 128, 88, 54);
+            var tail = Sd.Poly(P(176, 128, 242, 186, 226, 128, 242, 70), 6);
+            var topFin = Sd.Poly(P(86, 168, 124, 214, 150, 168), 5);
+            var lowFin = Sd.Poly(P(110, 92, 134, 54, 150, 96), 5);
+            c.Shadow(Sd.Union(body, tail, topFin, lowFin), 3, -9, 14, 0.38f);
+            c.Outlined(topFin, Pal.Outline, 7, Sh.V(214, 168, H("#F0805F"), H("#C4472F")));
+            c.Outlined(lowFin, Pal.Outline, 7, Sh.V(96, 54, H("#F0805F"), H("#C4472F")));
+            c.Outlined(tail, Pal.Outline, 7, Sh.V(186, 70, H("#F7A07A"), H("#CB4630")));
+            c.Outlined(body, Pal.Outline, 7, Sh.Lit(182, 74, H("#9ED8EE"), H("#3A83B2"), new Color(1, 1, 1, 0.5f), Pal.A(Pal.BlueDark, 0.5f), 12));
+            c.Fill(Sd.Inter(Sd.Ellipse(112, 104, 78, 30), body), Sh.Solid(Pal.A(Color.white, 0.55f)));          // pale belly
+            for (int row = 0; row < 3; row++)
+                for (int i = 0; i < 4; i++)
+                    c.Fill(Sd.Arc(70 + i * 30 + (row % 2) * 15, 140 - row * 22, 13, 3.2f, 200, 340), Sh.Solid(Pal.A(Pal.BlueDark, 0.45f)));   // scales
+            c.Fill(Sd.Capsule(168, 100, 172, 156, 3), Sh.Solid(Pal.A(Pal.BlueDark, 0.4f)));                    // gill line
+            c.Fill(Sd.Circle(60, 142, 13), Sh.Solid(Pal.Outline));
+            c.Fill(Sd.Circle(60, 142, 10), Sh.Solid(Color.white));
+            c.Fill(Sd.Circle(58, 141, 5.5f), Sh.Solid(Pal.Outline));
+            c.Fill(Sd.Circle(56, 144, 2f), Sh.Solid(Color.white));
+            c.Fill(Sd.Capsule(30, 118, 48, 112, 2.4f), Sh.Solid(Pal.A(Pal.Outline, 0.8f)));                    // mouth
+            c.Fill(Sd.Arc(112, 128, 80, 5, 105, 160), Sh.Solid(new Color(1, 1, 1, 0.55f)));
+            return c.ToTexture();
+        }
+
+        /// <summary>Building "Blacksmith": an anvil on a stump with flying sparks.</summary>
+        private static Texture2D Blacksmith()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            var stump = Sd.Box(128, 48, 66, 40, 10);
+            var face = Sd.Box(132, 140, 86, 21, 6);
+            var horn = Sd.Poly(P(50, 158, 6, 140, 50, 122), 4);
+            var waist = Sd.Poly(P(92, 124, 172, 124, 160, 84, 104, 84), 4);
+            var foot = Sd.Box(132, 78, 62, 14, 5);
+            c.Shadow(Sd.Union(stump, face, horn, waist, foot), 3, -9, 14, 0.38f);
+            c.Outlined(stump, Pal.Outline, 7, Sh.Lit(88, 8, H("#A9784A"), H("#4E3018"), new Color(1, 1, 1, 0.3f), Pal.A(Color.black, 0.45f), 10));
+            for (int i = 0; i < 4; i++) c.Fill(Sd.Capsule(80 + i * 32, 18, 84 + i * 32, 74, 2.2f), Sh.Solid(Pal.A(Color.black, 0.2f)));
+            c.Outlined(foot, Pal.Outline, 6, Sh.V(92, 64, H("#7E8995"), H("#3B444E")));
+            c.Outlined(waist, Pal.Outline, 6, Sh.V(124, 84, H("#6F7B87"), H("#343D47")));
+            c.Outlined(horn, Pal.Outline, 6, Sh.V(158, 122, H("#9AA6B2"), H("#4A5561")));
+            c.Outlined(face, Pal.Outline, 6, Sh.V(161, 119, H("#C5D0DA"), H("#69757F")));
+            c.Fill(Sd.Capsule(60, 154, 196, 154, 2.4f), Sh.Solid(new Color(1, 1, 1, 0.75f)));
+            // glowing iron on the face and sparks
+            c.Fill(Sd.Box(128, 168, 34, 8, 4), Sh.V(176, 160, H("#FFB347"), H("#E2531F")));
+            Sparkle(c, 98, 214, 20, 0.95f);
+            Sparkle(c, 162, 226, 16, 0.9f);
+            Sparkle(c, 196, 196, 14, 0.8f);
+            return c.ToTexture();
+        }
+
+        /// <summary>Building "Fisher Dock": a small boat with a sail beside a jetty on the water.</summary>
+        private static Texture2D FisherDock()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            var water = Sd.Ellipse(128, 52, 118, 40);
+            c.Shadow(water, 2, -6, 10, 0.3f);
+            c.Outlined(water, H("#1F5C8A"), 6, Sh.V(92, 12, H("#6CC7EC"), H("#2C86C2")));
+            c.Fill(Sd.Arc(70, 56, 20, 4, 200, 340), Sh.Solid(new Color(1, 1, 1, 0.55f)));
+            c.Fill(Sd.Arc(188, 44, 22, 4, 200, 340), Sh.Solid(new Color(1, 1, 1, 0.55f)));
+            // jetty: posts and deck
+            foreach (float px in new[] { 36f, 74f, 112f })
+                c.Outlined(Sd.Capsule(px, 40, px, 100, 7), Pal.Outline, 5, Sh.Linear(px - 7, 70, px + 7, 70, H("#9A6A40"), H("#4C2F19")));
+            var deck = Sd.Box(74, 106, 56, 9, 3);
+            c.Outlined(deck, Pal.Outline, 6, Sh.V(115, 97, H("#E0AE70"), H("#8A5A2E")));
+            for (int i = 0; i < 4; i++) c.Fill(Sd.Capsule(34 + i * 26, 100, 34 + i * 26, 112, 1.6f), Sh.Solid(Pal.A(Pal.Outline, 0.5f)));
+            // boat with a sail
+            var hull = Sd.Poly(P(124, 86, 232, 86, 212, 48, 148, 48), 8);
+            var mast = Sd.Capsule(176, 86, 176, 214, 5);
+            var sail = Sd.Poly(P(182, 206, 182, 100, 232, 100), 4);
+            var jib = Sd.Poly(P(170, 200, 170, 104, 130, 104), 4);
+            c.Shadow(Sd.Union(hull, mast, sail, jib), 2, -7, 10, 0.32f);
+            c.Outlined(jib, Pal.Outline, 5, Sh.V(200, 104, H("#FFF6DC"), H("#E3CFA0")));
+            c.Outlined(sail, Pal.Outline, 5, Sh.V(206, 100, H("#FFFFFF"), H("#EBDDBA")));
+            c.Outlined(mast, Pal.Outline, 4, Sh.Solid(H("#8A5A2E")));
+            c.Outlined(hull, Pal.Outline, 6, Sh.V(86, 48, H("#D78A4C"), H("#8F4B24")));
+            c.Fill(Sd.Capsule(138, 70, 224, 70, 3), Sh.Solid(Pal.A(Pal.Outline, 0.55f)));
+            c.Fill(Sd.Circle(208, 214, 9), Sh.Solid(Pal.RedLight));
+            return c.ToTexture();
+        }
+
+        /// <summary>Building "Road": cobbled path running away into the distance.</summary>
+        private static Texture2D Road()
+        {
+            var c = new PaintCanvas(256, 256, 3);
+            var verge = Sd.Poly(P(8, 24, 248, 24, 168, 238, 88, 238), 6);
+            var path = Sd.Poly(P(34, 34, 222, 34, 160, 226, 96, 226), 5);
+            c.Shadow(verge, 3, -9, 14, 0.38f);
+            c.Outlined(verge, Pal.Outline, 7, Sh.V(238, 24, H("#8FCB5C"), H("#4E9B3E")));
+            c.Outlined(path, Pal.Outline, 6, Sh.V(226, 34, H("#D9CDB3"), H("#A79B84")));
+            // cobbles in rows that shrink with distance
+            for (int row = 0; row < 7; row++)
+            {
+                float t = row / 6f;
+                float y = Mathf.Lerp(54, 206, t * t * 0.4f + t * 0.6f);
+                float half = Mathf.Lerp(88, 34, (y - 34) / 192f);
+                int n = row % 2 == 0 ? 4 : 3;
+                float sz = Mathf.Lerp(24, 11, (y - 34) / 192f);
+                for (int i = 0; i < n; i++)
+                {
+                    float x = 128 + (i - (n - 1) * 0.5f) * (2f * half / (n + 0.2f));
+                    var stone = Sd.Ellipse(x, y, sz * 1.15f, sz * 0.62f);
+                    c.Outlined(stone, Pal.A(Pal.Outline, 0.75f), 3, Sh.V(y + sz * 0.6f, y - sz * 0.6f, H("#F2EBD9"), H("#B4A78D")));
+                }
+            }
             return c.ToTexture();
         }
 

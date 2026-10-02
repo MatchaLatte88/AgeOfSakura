@@ -38,7 +38,7 @@ namespace AgeOfSakura.Tests
             created.Clear();
         }
 
-        private static (int w, int d) Footprint(string id) => id == "town_hall" ? (3, 3) : (2, 2);
+        private static (int w, int d) Footprint(string id) => id == "town_hall" ? (3, 3) : id == "fisher_dock" ? (2, 4) : id == "mine" ? (2, 3) : id == "road" ? (1, 1) : (2, 2);
 
         private GameObject Model(string id, int level)
         {

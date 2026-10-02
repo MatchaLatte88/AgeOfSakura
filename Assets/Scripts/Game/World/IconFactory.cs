@@ -14,7 +14,7 @@ namespace AgeOfSakura.Game
         // Ids the game code relies on. A missing one fails loudly at startup instead of showing an empty image later.
         private static readonly string[] Required =
         {
-            "coin", "wood", "diamond", "hammer", "check", "cross", "rotate", "gear", "house", "woodcutter", "town_hall", "rice", "rice_paddy", "garden", "shrine", "beauty", "noise", "faith", "upgrade", "lock", "clock",
+            "coin", "wood", "diamond", "hammer", "check", "cross", "rotate", "gear", "house", "woodcutter", "town_hall", "rice", "tools", "fish", "iron", "mine", "rice_paddy", "garden", "shrine", "blacksmith", "fisher_dock", "road", "beauty", "noise", "faith", "upgrade", "lock", "clock",
             "bubble", "bubble_tail", "badge", "alert", "medallion", "glow", "sparkle", "rays", "shine", "vignette", "fade_top", "fade_bottom",
             "paper_noise", "panel_paper", "panel_lacquer", "pill_lacquer", "pill_paper", "card_paper", "card_locked", "trough", "bar_green",
             "bar_gold", "divider", "tail_paper",
@@ -53,6 +53,9 @@ namespace AgeOfSakura.Game
                 case CurrencyType.Wood: return Get("wood");
                 case CurrencyType.Diamonds: return Get("diamond");
                 case CurrencyType.Rice: return Get("rice");
+                case CurrencyType.Tools: return Get("tools");
+                case CurrencyType.Fish: return Get("fish");
+                case CurrencyType.Iron: return Get("iron");
                 default: throw new ArgumentOutOfRangeException(nameof(currency));
             }
         }

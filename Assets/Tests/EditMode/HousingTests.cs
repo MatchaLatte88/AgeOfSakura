@@ -23,6 +23,12 @@ namespace AgeOfSakura.Tests
             session.Wallet.Add(CurrencyType.Coins, 1000, CurrencyTransactionReason.DebugGrant);
             session.Wallet.Add(CurrencyType.Wood, 400, CurrencyTransactionReason.DebugGrant);
             session.Wallet.Add(CurrencyType.Rice, 100, CurrencyTransactionReason.DebugGrant);
+            session.Wallet.Add(CurrencyType.Tools, 100, CurrencyTransactionReason.DebugGrant);
+            session.Wallet.Add(CurrencyType.Fish, 100, CurrencyTransactionReason.DebugGrant);
+            session.Wallet.Add(CurrencyType.Iron, 100, CurrencyTransactionReason.DebugGrant);
+            // two road cells lead from the Town Hall (9..11 x 10..12) past the house at HousePos, so level 2 can ask for a road connection
+            Assert.IsTrue(session.Buildings.TryPlace("road", new GridPos(9, 9), 0).Success);
+            Assert.IsTrue(session.Buildings.TryPlace("road", new GridPos(8, 9), 0).Success);
         }
 
         private BuildingInstance Place(string id, GridPos pos)
@@ -215,7 +221,7 @@ namespace AgeOfSakura.Tests
 
             var cutter = Place("woodcutter", new GridPos(5, 5));
             var shrine = Place("shrine", ShrinePos);
-            var second = Place("garden", new GridPos(7, 9));
+            var second = Place("garden", new GridPos(11, 5));
             Assert.AreNotEqual(garden.InstanceId, second.InstanceId);
 
             var info = session.Housing.Evaluate(house);
@@ -368,8 +374,8 @@ namespace AgeOfSakura.Tests
             var wallet = s.Wallet;
             BuildingInstance cutter = s.Buildings.TryPlace("woodcutter", new GridPos(5, 5), 0).Instance;
             BuildingInstance paddy = s.Buildings.TryPlace("rice_paddy", new GridPos(13, 13), 0).Instance;
-            BuildingInstance house = null;
-            bool garden = false, shrine = false;
+            BuildingInstance house = null, smith = null, dock = null, mine = null;
+            bool garden = false, shrine = false, roads = false;
             int levelTwoAt = -1, levelThreeAt = -1;
 
             void Work(BuildingInstance b, string production)
@@ -385,6 +391,15 @@ namespace AgeOfSakura.Tests
                 s.Production.Refresh();
                 Work(cutter, "wood_medium");
                 Work(paddy, "rice_medium");
+                // one road cell touches the Town Hall (9..11 x 10..12) and the house at (7,8)
+                if (!roads && wallet.CanAfford(CurrencyType.Coins, 5)) roads = s.Buildings.TryPlace("road", new GridPos(8, 10), 0).Success;
+                // tools open the way (garden, shrine and every upgrade cost them), fish feeds the level 2 and 3 tax runs
+                if (house != null && mine == null) { var p = s.Buildings.TryPlace("mine", new GridPos(8, 3), 2); if (p.Success) mine = p.Instance; }
+                if (mine != null && wallet.GetBalance(CurrencyType.Iron) < 30) Work(mine, "iron_medium");
+                if (house != null && smith == null) { var p = s.Buildings.TryPlace("blacksmith", new GridPos(5, 10), 0); if (p.Success) smith = p.Instance; }
+                if (house != null && house.Level >= 2 && dock == null) { var p = s.Buildings.TryPlace("fisher_dock", new GridPos(14, 6), 1); if (p.Success) dock = p.Instance; }
+                if (smith != null && wallet.GetBalance(CurrencyType.Tools) < 20 && wallet.GetBalance(CurrencyType.Wood) >= 12 && wallet.GetBalance(CurrencyType.Iron) >= 7) Work(smith, "tools_medium");
+                if (dock != null) Work(dock, "fish_medium");
                 if (house == null)
                 {
                     var placed = s.Buildings.TryPlace("house", new GridPos(7, 8), 0);
@@ -403,12 +418,14 @@ namespace AgeOfSakura.Tests
                 }
                 // level 3 asks for quiet: once the shrine stands, move the woodcutter out of earshot
                 if (shrine && house.Level == 2 && s.Housing.GetEnvironment(house, EnvironmentVariable.Noise) > 2f)
-                    s.Buildings.TryMove(cutter.InstanceId, new GridPos(13, 5), 0);
+                    s.Buildings.TryMove(cutter.InstanceId, new GridPos(12, 4), 0);
             }
 
             TestContext.WriteLine($"level 2 after {levelTwoAt / 60} min, level 3 after {levelThreeAt / 60} min");
-            Assert.Greater(levelTwoAt, 0, "the bot never reached level 2");
-            Assert.Greater(levelThreeAt, 0, "the bot never reached level 3");
+            string state = $"coins {wallet.GetBalance(CurrencyType.Coins)}, wood {wallet.GetBalance(CurrencyType.Wood)}, rice {wallet.GetBalance(CurrencyType.Rice)}, tools {wallet.GetBalance(CurrencyType.Tools)}, "
+                + $"fish {wallet.GetBalance(CurrencyType.Fish)}; dock {dock != null}, shrine {shrine}; house {(house == null ? "none" : "L" + house.Level + " cycles " + house.CyclesAtLevel)}, smith {smith != null}, garden {garden}, roads {roads}";
+            Assert.Greater(levelTwoAt, 0, "the bot never reached level 2: " + state);
+            Assert.Greater(levelThreeAt, 0, "the bot never reached level 3: " + state);
             Assert.Less(levelTwoAt, 30 * 60, "level 2 should be reachable within half an hour");
         }
     }

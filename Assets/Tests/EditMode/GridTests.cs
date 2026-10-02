@@ -17,13 +17,13 @@ namespace AgeOfSakura.Tests
         [Test]
         public void Map_HasExpectedSizeAndUnlockedArea()
         {
-            Assert.AreEqual(20, grid.Width);
-            Assert.AreEqual(20, grid.Height);
+            Assert.AreEqual(40, grid.Width);
+            Assert.AreEqual(40, grid.Height);
             int unlocked = 0;
             for (int x = 0; x < grid.Width; x++)
                 for (int z = 0; z < grid.Height; z++)
                     if (grid.GetCell(x, z).Unlocked) unlocked++;
-            Assert.AreEqual(144, unlocked);
+            Assert.AreEqual(14 * 13, unlocked);
         }
 
         [Test]
@@ -59,7 +59,7 @@ namespace AgeOfSakura.Tests
         [Test]
         public void OutOfBounds_IsRejected()
         {
-            Assert.AreEqual(PlacementCheck.OutOfBounds, grid.CheckPlacement(new GridPos(19, 19), 2, 2));
+            Assert.AreEqual(PlacementCheck.OutOfBounds, grid.CheckPlacement(new GridPos(39, 39), 2, 2));
             Assert.AreEqual(PlacementCheck.OutOfBounds, grid.CheckPlacement(new GridPos(-1, 5), 2, 2));
         }
 

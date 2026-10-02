@@ -25,7 +25,7 @@ namespace AgeOfSakura.Game
             public float FlashUntil;
         }
 
-        private const float ChipWidth = 290f;
+        private const float ChipWidth = 222f;
         private const float ChipHeight = 98f;
 
         private readonly List<Chip> chips = new List<Chip>(4);
@@ -42,9 +42,9 @@ namespace AgeOfSakura.Game
         private void Build(UiKit kitRef, RectTransform root, Wallet wallet)
         {
             kit = kitRef;
-            UiKit.Place(root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -26f), new Vector2(1400f, 110f));
+            UiKit.Place(root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -26f), new Vector2(1740f, 110f));
             var layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 44f;
+            layout.spacing = 20f;
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -52,7 +52,7 @@ namespace AgeOfSakura.Game
             layout.childForceExpandHeight = false;
             layout.padding = new RectOffset(28, 0, 0, 0); // room for the icons that overhang the chips
 
-            foreach (CurrencyType currency in new[] { CurrencyType.Coins, CurrencyType.Wood, CurrencyType.Rice, CurrencyType.Diamonds })
+            foreach (CurrencyType currency in new[] { CurrencyType.Coins, CurrencyType.Wood, CurrencyType.Iron, CurrencyType.Tools, CurrencyType.Rice, CurrencyType.Fish, CurrencyType.Diamonds })
             {
                 var chip = new Chip { Currency = currency };
                 var pill = kit.Sliced(root, currency + "Chip", "pill_lacquer", true);
@@ -82,6 +82,10 @@ namespace AgeOfSakura.Game
                 chip.Text = kit.Text(pill.transform, "0", TextStyle.Number, 58, Palette.Cream, TextAlignmentOptions.MidlineRight, FontStyles.Bold, "Amount");
                 UiKit.Stretch(chip.Text.rectTransform, 96f, 2f, 34f, 4f);
                 chip.Text.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                // six chips share the bar: long numbers shrink instead of spilling over the rim
+                chip.Text.enableAutoSizing = true;
+                chip.Text.fontSizeMin = 30f;
+                chip.Text.fontSizeMax = 58f;
 
                 chip.Target = wallet.GetBalance(currency);
                 chip.Shown = chip.Target;

@@ -81,6 +81,10 @@ namespace AgeOfSakura.Core
                     Rotatable = b.Bool("rotatable", true),
                     Buildable = b.Bool("buildable", true),
                     VisualLevel = b.Int("visualLevel", 1),
+                    Shore = b.Bool("shore", false),
+                    PierCells = b.Int("pierCells", 0),
+                    PierTerrain = ParseTerrain(b.StrOrNull("pierTerrain") ?? "Water", b.Path),
+                    Chain = b.Bool("chain", false),
                     UpgradeToId = b.StrOrNull("upgradeTo"),
                     Emits = ParseEffects(b.ObjListOrEmpty("emits")),
                     Levels = ParseLevels(b.ObjListOrEmpty("levels"))
@@ -114,9 +118,18 @@ namespace AgeOfSakura.Core
                 Seed = map.Int("seed", 1),
                 Rows = map.StrList("rows").ToArray()
             };
+            foreach (var e in map.ObjListOrEmpty("expansions"))
+                defs.Map.Expansions.Add(new MapExpansion { Level = e.Int("level"), X = e.Int("x"), Z = e.Int("z"), Width = e.Int("width"), Height = e.Int("height") });
 
             defs.BuildIndex();
             return defs;
+        }
+
+        private static TerrainType ParseTerrain(string name, string path)
+        {
+            if (!Enum.TryParse(name, false, out TerrainType terrain) || !Enum.IsDefined(typeof(TerrainType), terrain))
+                throw new MiniJsonException($"{path}.pierTerrain: unknown terrain '{name}'");
+            return terrain;
         }
 
         private static List<CurrencyAmount> ParseAmounts(List<JObj> items)
@@ -245,6 +258,8 @@ namespace AgeOfSakura.Core
                 if (b.UpgradeToId != null && defs.Buildings.TrueForAll(o => o.Id != b.UpgradeToId))
                     errors.Add($"building '{b.Id}': unknown upgradeTo '{b.UpgradeToId}'");
                 foreach (var e in b.Emits) ValidateEffect(e, $"building '{b.Id}' emits", errors);
+                if (b.Shore && (b.PierCells < 1 || b.PierCells >= Math.Max(b.FootprintWidth, b.FootprintHeight)))
+                    errors.Add($"building '{b.Id}': a shore building needs pierCells between 1 and its length - 1");
                 ValidateLevels(b, productionIds, errors);
             }
             foreach (var t in defs.TerrainEffects) ValidateEffect(t.Effect, $"environment terrain {t.Terrain}", errors);
@@ -326,6 +341,13 @@ namespace AgeOfSakura.Core
             var grid = GridMap.FromDefinition(m);
             var check = grid.CheckPlacement(m.TownHallOrigin, hall.FootprintWidth, hall.FootprintHeight);
             if (check != PlacementCheck.Ok) errors.Add($"map: town hall cannot be placed at {m.TownHallOrigin} ({check})");
+
+            foreach (var e in m.Expansions)
+            {
+                if (e.Level < 2 || e.Level > hall.MaxLevel) errors.Add($"map: expansion at level {e.Level} needs a town hall level between 2 and {hall.MaxLevel}");
+                if (e.X < 0 || e.Z < 0 || e.Width <= 0 || e.Height <= 0 || e.X + e.Width > m.Width || e.Z + e.Height > m.Height)
+                    errors.Add($"map: expansion at level {e.Level} lies outside the map");
+            }
         }
     }
 }

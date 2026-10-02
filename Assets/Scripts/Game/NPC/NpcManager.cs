@@ -57,9 +57,12 @@ namespace AgeOfSakura.Game
         {
             // villagers stay in and just around the unlocked land, on free walkable ground
             if (!c.IsWalkable) return false;
-            var map = session.Definitions.Map;
-            return c.Pos.X >= map.UnlockedX - 1 && c.Pos.X <= map.UnlockedX + map.UnlockedWidth
-                && c.Pos.Z >= map.UnlockedZ - 1 && c.Pos.Z <= map.UnlockedZ + map.UnlockedHeight;
+            if (c.Unlocked) return true;
+            var grid = session.Grid;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                    if (grid.TryGetCell(c.Pos.X + dx, c.Pos.Z + dz, out var n) && n.Unlocked) return true;
+            return false;
         }
 
         public void Update(float dt)
@@ -131,7 +134,6 @@ namespace AgeOfSakura.Game
         private bool PickDestination()
         {
             var grid = session.Grid;
-            var map = session.Definitions.Map;
             var start = grid.WorldToCell(position.x, position.z);
             if (!grid.InBounds(start)) return false;
 
@@ -141,9 +143,8 @@ namespace AgeOfSakura.Game
                 if (visitsBuildings && rng.NextDouble() < 0.35 && TryPickNearBuilding(out goal)) { }
                 else
                 {
-                    int gx = Mathf.Clamp(start.X + rng.Next(-roamRadius, roamRadius + 1), map.UnlockedX, map.UnlockedX + map.UnlockedWidth - 1);
-                    int gz = Mathf.Clamp(start.Z + rng.Next(-roamRadius, roamRadius + 1), map.UnlockedZ, map.UnlockedZ + map.UnlockedHeight - 1);
-                    goal = new GridPos(gx, gz);
+                    goal = new GridPos(start.X + rng.Next(-roamRadius, roamRadius + 1), start.Z + rng.Next(-roamRadius, roamRadius + 1));
+                    if (!grid.InBounds(goal)) continue;
                 }
                 if (goal == start) continue;
                 if (!GridPathfinder.FindPath(grid, start, goal, Walkable, path) || path.Count == 0 || path.Count > 30) continue;

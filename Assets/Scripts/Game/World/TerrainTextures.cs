@@ -25,7 +25,7 @@ namespace AgeOfSakura.Game
                     var t = grid.GetCell(x, z).Terrain;
                     dirt[x, z] = t == TerrainType.Dirt ? 1f : 0f;
                     water[x, z] = (t == TerrainType.Water || t == TerrainType.Bridge) ? 1f : 0f;
-                    forest[x, z] = (t == TerrainType.Tree || t == TerrainType.Bamboo || t == TerrainType.Rock || t == TerrainType.Cherry) ? 1f : 0f;
+                    forest[x, z] = (t == TerrainType.Tree || t == TerrainType.Bamboo || t == TerrainType.Rock || t == TerrainType.Cherry || t == TerrainType.Mountain) ? 1f : 0f;
                 }
             }
 

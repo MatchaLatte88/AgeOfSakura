@@ -44,7 +44,9 @@ namespace AgeOfSakura.Core
         Served,
         Beauty,
         Noise,
-        Faith
+        Faith,
+        /// <summary>Value 1 when the building touches a road (or bridge) chain that leads to the Town Hall, else 0.</summary>
+        Connected
     }
 
     public sealed class NeedRequirement
@@ -104,6 +106,12 @@ namespace AgeOfSakura.Core
         /// <summary>Whether the building appears in the build menu (Town Hall does not).</summary>
         public bool Buildable;
         public int VisualLevel = 1;
+        /// <summary>Shore buildings (the Fisher Dock) stand with their landward part on land and their last <see cref="PierCells"/> cells in water.</summary>
+        public bool Shore;
+        public int PierCells;
+        public TerrainType PierTerrain = TerrainType.Water;
+        /// <summary>After placing one, the placement mode starts again (roads are laid cell by cell).</summary>
+        public bool Chain;
         /// <summary>Unused; the level path below is the upgrade mechanic.</summary>
         public string UpgradeToId;
         /// <summary>Environment values this building adds to its surroundings (Garden: Beauty, Woodcutter: Noise, ...).</summary>
@@ -112,6 +120,13 @@ namespace AgeOfSakura.Core
         public List<BuildingLevelDefinition> Levels = new List<BuildingLevelDefinition>();
 
         public int MaxLevel => Levels.Count > 0 ? Levels[Levels.Count - 1].Level : 1;
+
+        /// <summary>The placement rule for a rotation, or null for ordinary land buildings.</summary>
+        public PlacementRule RuleFor(int rotation)
+        {
+            if (Shore) return new PlacementRule { PierCells = PierCells, PierTerrain = PierTerrain, Rotation = rotation };
+            return Category == RoadNetwork.RoadCategory ? new PlacementRule { WalkableSurface = true } : null;
+        }
 
         public bool TryGetLevel(int level, out BuildingLevelDefinition definition)
         {
@@ -167,9 +182,20 @@ namespace AgeOfSakura.Core
         public float PlacementGrabRadiusCells = 1.5f;
     }
 
+    /// <summary>Land that opens up when the Town Hall reaches <see cref="Level"/>.</summary>
+    public sealed class MapExpansion
+    {
+        public int Level;
+        public int X;
+        public int Z;
+        public int Width;
+        public int Height;
+    }
+
     /// <summary>ASCII terrain map. rows[z][x]; see <see cref="ParseCell"/> for the legend.</summary>
     public sealed class MapDefinition
     {
+        public List<MapExpansion> Expansions = new List<MapExpansion>();
         public int Width;
         public int Height;
         public int UnlockedX;
@@ -186,7 +212,7 @@ namespace AgeOfSakura.Core
             switch (c)
             {
                 case '.': case ',': case '~': case '=': case 'T': case 'C': case 'B': case 'R':
-                case 'f': case 's': case 'g': case 'r':
+                case 'f': case 's': case 'g': case 'r': case 'M':
                     return true;
                 default:
                     return false;
@@ -194,7 +220,7 @@ namespace AgeOfSakura.Core
         }
 
         /// <summary>
-        /// Legend: . grass, ',' dirt, ~ water, = bridge, T tree, C cherry tree, B bamboo, R big rock,
+        /// Legend: . grass, ',' dirt, ~ water, = bridge, T tree, C cherry tree, B bamboo, R big rock, M mountain,
         /// f/s/g/r = buildable grass carrying removable flowers / shrub / tuft / small rock.
         /// </summary>
         public static void ParseCell(char c, out TerrainType terrain, out CosmeticKind cosmetic)
@@ -210,6 +236,7 @@ namespace AgeOfSakura.Core
                 case 'C': terrain = TerrainType.Cherry; break;
                 case 'B': terrain = TerrainType.Bamboo; break;
                 case 'R': terrain = TerrainType.Rock; break;
+                case 'M': terrain = TerrainType.Mountain; break;
                 case 'f': terrain = TerrainType.Grass; cosmetic = CosmeticKind.Flowers; break;
                 case 's': terrain = TerrainType.Grass; cosmetic = CosmeticKind.Shrub; break;
                 case 'g': terrain = TerrainType.Grass; cosmetic = CosmeticKind.Tuft; break;
