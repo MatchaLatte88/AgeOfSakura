@@ -708,12 +708,15 @@ namespace AgeOfSakura.Game
             RidgeBands(roof, ridgeY + 0.025f, roofW, 0.095f, FrameMat);
             foreach (var sx in new[] { -1f, 1f })
                 prim.Sphere(roof, ThatchDarkMat, new Vector3(sx * (roofW * 0.5f + 0.03f), ridgeY + 0.025f, 0f), new Vector3(0.14f, 0.17f, 0.17f), false);
-            MossPatches(roof, roofY, roofD * 0.5f, roofH, curve, -1f, new Vector2(-0.35f, 0.5f), new Vector2(0.2f, 0.3f), new Vector2(0.55f, 0.6f));
-            MossPatches(roof, roofY, roofD * 0.5f, roofH, curve, 1f, new Vector2(-0.1f, 0.45f));
+            if (level < 2) // from level 2 on, HouseDetails lays small moss clumps instead of these flat discs
+            {
+                MossPatches(roof, roofY, roofD * 0.5f, roofH, curve, -1f, new Vector2(-0.35f, 0.5f), new Vector2(0.2f, 0.3f), new Vector2(0.55f, 0.6f));
+                MossPatches(roof, roofY, roofD * 0.5f, roofH, curve, 1f, new Vector2(-0.1f, 0.45f));
+            }
 
             if (level >= 2)
             {
-                // flower boxes, a hanging paper lantern under the veranda eave, a second tier of thatch along the ridge
+                // flower boxes, a hanging paper lantern under the veranda eave (the rest of the level 2 finish is in HouseDetails)
                 foreach (var z in new[] { -0.44f, 0.44f })
                 {
                     prim.Box(body, WoodMat, new Vector3(-hw - 0.09f, wallBase + 0.21f, z), new Vector3(0.09f, 0.07f, 0.26f), default, false);
@@ -738,6 +741,7 @@ namespace AgeOfSakura.Game
                 prim.Add(roof, ProceduralMeshes.GableRoof(0.3f, 0.5f, 0.2f, 0.3f, 0.04f), ThatchMat, new Vector3(0.3f, dy + 0.21f, dz), Vector3.one, new Vector3(0f, 90f, 0f), "DormerRoof");
                 prim.Cylinder(roof, ThatchDarkMat, new Vector3(0.3f, dy + 0.4f, dz), 0.045f, 0.44f, new Vector3(90f, 0f, 0f), false);
             }
+            if (level >= 2) HouseDetails(level, Rng("house_details"), ground, body, roof, props, roofY, ridgeY); // own sequence: the shrubs below keep their shape
 
             // front fence with a small gate, rain barrel with lid and bamboo gutter, drying daikon, firewood, cabbages at the back
             var fence = FrameMat;
@@ -776,6 +780,161 @@ namespace AgeOfSakura.Game
                 fl.transform.localScale = Vector3.one * 0.45f;
             }
             return root;
+        }
+
+        /// <summary>Straight bar between two points (long axis along the segment); used for edges that follow a roof slope.</summary>
+        private GameObject Bar(Transform t, Material m, Vector3 a, Vector3 b, float width, float thick)
+        {
+            var d = b - a;
+            var go = prim.Box(t, m, (a + b) * 0.5f, new Vector3(width, thick, d.magnitude), default, false);
+            go.transform.localRotation = Quaternion.LookRotation(d.normalized, Vector3.up);
+            return go;
+        }
+
+        private void HouseDetails(int level, System.Random rng, Transform ground, Transform body, Transform roof, Transform props, float roofY, float ridgeY)
+        {
+            prim.ThinBoxes = true; // rafter tips, slats, battens and courses: flat boxes for everything hair-thin
+            try { BuildHouseDetails(level, rng, ground, body, roof, props, roofY, ridgeY); }
+            finally { prim.ThinBoxes = false; }
+        }
+
+        /// <summary>
+        /// Level 2 and up: the cottage is finished like a well-kept farm. Roof: thick rake edges, thatch courses, a fuller ridge with crossed
+        /// ridge boards, moss clumps, rafter and purlin tips. Walls: burnt-cedar boards below the windows, lattice slats over the windows.
+        /// Veranda: lintel, tie beams and knee braces, dried persimmons, straw sandals and a sleeping cat. Measures mirror <see cref="House"/>;
+        /// everything stays inside the footprint.
+        /// </summary>
+        private void BuildHouseDetails(int level, System.Random rng, Transform ground, Transform body, Transform roof, Transform props, float roofY, float ridgeY)
+        {
+            const float hw = 0.7f, hd = 0.64f, wallBase = 0.13f, roofH = 0.78f, curve = 0.35f;
+            const float roofW = hw * 2f + 0.28f, roofD = hd * 2f + 0.3f;
+            float deckTop = wallBase + 0.05f;
+            var dark = FrameMat;
+            var wood = WoodMat;
+            var rope = art.Lit(Hex("#b79a6a"));
+            var burnt = art.Lit(Hex("#4a3322"), PaintedTexture.Planks);
+
+            // a point on the front (zSign -1) or back (+1) roof slope, f = 0 at the eave .. 1 at the ridge, and the slope's angle there
+            Vector3 Slope(float x, float f, float zSign = -1f) => new Vector3(x, roofY + RoofSurface(roofH, curve, f), zSign * roofD * 0.5f * (1f - f));
+            float SlopeAngle(float f) => Mathf.Atan2(RoofSurface(roofH, curve, f + 0.05f) - RoofSurface(roofH, curve, f - 0.05f), roofD * 0.05f) * Mathf.Rad2Deg;
+
+            // thick thatch edge along both slopes at both gable ends (the roof surface alone ends in a paper-thin edge)
+            var rake = ThatchDarkMat;
+            var lift = Vector3.up * 0.03f;
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var sz in new[] { -1f, 1f })
+                {
+                    float x = sx * (roofW * 0.5f + 0.005f);
+                    var eave = Slope(x, 0f, sz) + new Vector3(0f, 0.045f, sz * 0.06f); // the lip flicks up and out
+                    var kink = Slope(x, curve, sz) + lift;
+                    Bar(roof, rake, eave, kink, 0.08f, 0.065f);
+                    Bar(roof, rake, kink, Slope(x, 1f, sz) + lift, 0.08f, 0.065f);
+                    prim.Sphere(roof, rake, kink, new Vector3(0.09f, 0.075f, 0.075f), false);
+                    prim.Sphere(roof, rake, eave, new Vector3(0.085f, 0.07f, 0.085f), false);
+                }
+
+            // thatch courses: thin tied rolls across the front slope (the dormer of level 3 sits in front of the middle ones)
+            var courseMat = ThatchDarkMat;
+            void Course(float x0, float x1, float f)
+            {
+                var p = Slope(0f, f);
+                var roll = prim.Cylinder(roof, courseMat, new Vector3((x0 + x1) * 0.5f, p.y + 0.014f, p.z), 0.018f, x1 - x0, default, false);
+                roll.transform.localRotation = Quaternion.Euler(-SlopeAngle(f), 0f, 0f) * Quaternion.Euler(0f, 0f, 90f);
+            }
+            float[] rows = { 0.17f, 0.34f, 0.52f, 0.7f, 0.88f };
+            for (int i = 0; i < rows.Length; i++)
+            {
+                float left = i % 2 == 0 ? -0.8f : -0.72f, right = i % 2 == 0 ? 0.74f : 0.8f;
+                if (level >= 3 && rows[i] > 0.3f && rows[i] < 0.8f) { Course(left, -0.02f, rows[i]); Course(0.62f, right, rows[i]); }
+                else Course(left, right, rows[i]);
+            }
+
+            // a fuller ridge (a roll on either side of the main one) with crossed ridge boards at both ends
+            foreach (var z in new[] { -0.085f, 0.085f })
+                prim.Cylinder(roof, ThatchMat, new Vector3(0f, ridgeY - 0.02f, z), 0.06f, roofW - 0.04f, new Vector3(0f, 0f, 90f), false);
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var tilt in new[] { -32f, 32f })
+                    prim.Box(roof, dark, new Vector3(sx * (roofW * 0.5f + 0.075f), ridgeY + 0.1f, 0f), new Vector3(0.032f, 0.46f, 0.032f), new Vector3(tilt, 0f, 0f), false);
+
+            // moss in small clumps instead of flat discs
+            var moss = art.NoOutline(Color.Lerp(Color.Lerp(ToonStyle.Moss, Palette.Straw, 0.45f), Palette.GrassDark, 0.3f));
+            var mossLight = art.NoOutline(Color.Lerp(ToonStyle.Moss, Palette.Straw, 0.3f));
+            foreach (var (cx, cf, zSign) in new[] { (-0.5f, 0.16f, -1f), (0.52f, 0.24f, -1f), (-0.18f, 0.5f, -1f), (0.66f, 0.62f, -1f), (-0.1f, 0.45f, 1f) })
+            {
+                var tilt = Quaternion.Euler(SlopeAngle(cf) * zSign, 0f, 0f);
+                for (int i = 0; i < 5; i++)
+                {
+                    var p = Slope(cx + ((float)rng.NextDouble() - 0.5f) * 0.16f, cf + ((float)rng.NextDouble() - 0.5f) * 0.08f, zSign) + Vector3.up * 0.012f;
+                    float k = 0.035f + (float)rng.NextDouble() * 0.04f;
+                    var blob = prim.Sphere(roof, i % 3 == 0 ? mossLight : moss, p, new Vector3(k * 1.3f, 0.02f, k), false);
+                    blob.transform.localRotation = tilt * Quaternion.Euler(0f, (float)rng.NextDouble() * 180f, 0f);
+                }
+            }
+
+            // rafter tips under the front eave, purlin ends poking out of the gable walls
+            for (int i = 0; i < 10; i++)
+                prim.Box(roof, dark, new Vector3(-0.72f + i * 0.16f, roofY - 0.035f, -(roofD * 0.5f - 0.015f)), new Vector3(0.032f, 0.038f, 0.12f), default, false);
+            var purlinEnd = art.Lit(Palette.LogEnd, PaintedTexture.LogEnd);
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var (z, h) in new[] { (-0.38f, 0.17f), (0.38f, 0.17f), (-0.17f, 0.37f), (0.17f, 0.37f) })
+                {
+                    prim.Cylinder(roof, BarkMat, new Vector3(sx * (hw + 0.075f), roofY + h, z), 0.032f, 0.15f, new Vector3(0f, 0f, 90f), false);
+                    prim.Cylinder(roof, purlinEnd, new Vector3(sx * (hw + 0.152f), roofY + h, z), 0.027f, 0.012f, new Vector3(0f, 0f, 90f), false);
+                }
+
+            // lower walls: burnt-cedar boards with battens, in front (either side of the door) and on the left wall
+            const float boardY = 0.27f, boardH = 0.16f;
+            foreach (var (x0, x1) in new[] { (-0.64f, -0.32f), (0.09f, 0.64f) })
+            {
+                prim.Box(body, burnt, new Vector3((x0 + x1) * 0.5f, boardY, -hd + 0.005f), new Vector3(x1 - x0, boardH, 0.03f), default, false);
+                int n = Mathf.RoundToInt((x1 - x0) / 0.07f);
+                for (int i = 0; i < n; i++)
+                    prim.Box(body, dark, new Vector3(x0 + (i + 0.5f) * (x1 - x0) / n, boardY, -hd - 0.012f), new Vector3(0.018f, boardH, 0.014f), default, false);
+            }
+            prim.Box(body, burnt, new Vector3(-hw + 0.005f, boardY, 0f), new Vector3(0.03f, boardH, 1.18f), default, false);
+            for (int i = 0; i < 16; i++)
+                prim.Box(body, dark, new Vector3(-hw - 0.012f, boardY, -0.59f + (i + 0.5f) * 1.18f / 16f), new Vector3(0.014f, boardH, 0.018f), default, false);
+
+            // lattice slats in front of the windows
+            for (int i = 0; i < 4; i++)
+                prim.Box(body, wood, new Vector3(0.36f + (i - 1.5f) * 0.065f, wallBase + 0.36f, -hd - 0.03f), new Vector3(0.012f, 0.22f, 0.012f), default, false);
+            foreach (var z in new[] { -0.44f, 0.44f })
+                for (int i = 0; i < 3; i++)
+                    prim.Box(body, wood, new Vector3(-hw - 0.03f, wallBase + 0.36f, z + (i - 1f) * 0.065f), new Vector3(0.012f, 0.2f, 0.012f), default, false);
+
+            // veranda: a lintel between the posts, tie beams back to the wall and knee braces
+            prim.Box(body, dark, new Vector3(-0.1f, 0.6f, -hd - 0.22f), new Vector3(0.96f, 0.05f, 0.05f), default, false);
+            foreach (var (x, dir) in new[] { (-0.58f, 1f), (0.38f, -1f) })
+            {
+                prim.Box(body, dark, new Vector3(x, 0.635f, -hd - 0.125f), new Vector3(0.05f, 0.045f, 0.2f), default, false);
+                prim.Box(body, wood, new Vector3(x + dir * 0.065f, 0.54f, -hd - 0.22f), new Vector3(0.035f, 0.17f, 0.035f), new Vector3(0f, 0f, -dir * 50f), false);
+            }
+
+            // dried persimmons on strings under the lintel
+            var persimmon = art.Lit(Hex("#e8812a"));
+            foreach (float x in new[] { 0f, 0.09f })
+            {
+                prim.Cylinder(body, rope, new Vector3(x, 0.465f, -hd - 0.22f), 0.004f, 0.27f, default, false);
+                for (int i = 0; i < 5; i++)
+                    prim.Sphere(body, persimmon, new Vector3(x + (i % 2 == 0 ? -0.018f : 0.018f), 0.56f - i * 0.045f, -hd - 0.22f), new Vector3(0.05f, 0.052f, 0.05f), false);
+            }
+
+            // straw sandals on the step stone
+            var straw = art.Lit(Hex("#d9b96a"), PaintedTexture.Thatch);
+            var strap = art.Lit(Palette.BannerRed);
+            foreach (float x in new[] { -0.2f, -0.12f })
+            {
+                prim.Box(ground, straw, new Vector3(x, 0.068f, -0.98f), new Vector3(0.05f, 0.016f, 0.11f), default, false);
+                prim.Box(ground, strap, new Vector3(x, 0.079f, -0.96f), new Vector3(0.042f, 0.008f, 0.012f), default, false);
+            }
+
+            // a tabby asleep at the right end of the veranda
+            var fur = art.Lit(Hex("#d98a45"));
+            prim.Sphere(body, fur, new Vector3(0.28f, deckTop + 0.045f, -0.75f), new Vector3(0.16f, 0.09f, 0.1f), false);
+            prim.Sphere(body, fur, new Vector3(0.2f, deckTop + 0.055f, -0.765f), 0.04f);
+            prim.Cone(body, fur, new Vector3(0.187f, deckTop + 0.083f, -0.765f), 0.012f, 0.026f);
+            prim.Cone(body, fur, new Vector3(0.213f, deckTop + 0.083f, -0.765f), 0.012f, 0.026f);
+            prim.Sphere(body, fur, new Vector3(0.355f, deckTop + 0.035f, -0.735f), new Vector3(0.09f, 0.035f, 0.035f), false);
         }
 
         // ---------------------------------------------------------------- Woodcutter (2x2): open log workshop, levels 1..3

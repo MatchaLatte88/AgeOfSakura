@@ -110,7 +110,7 @@ namespace AgeOfSakura.Game
                 UiShowcase.Begin(runtimeRoot, showcaseOptions, new UiShowcase.Context
                 {
                     Session = session, Ui = ui, Selection = selection, Placement = placement, Camera = cameraController, Views = views,
-                    Art = art, Prim = prim, Props = props, Actors = actors
+                    Art = art, Prim = prim, Props = props, Actors = actors, Models = models
                 });
             }
 

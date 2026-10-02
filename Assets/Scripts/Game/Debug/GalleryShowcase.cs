@@ -34,15 +34,39 @@ namespace AgeOfSakura.Game
 
         public IEnumerator Run()
         {
+            BuildStage();
+            yield return Actors();
+            yield return Vegetation();
+        }
+
+        /// <summary>Photographs one building model at all three looks, whole and in close-ups of the two faces the camera sees.</summary>
+        public IEnumerator RunBuilding(string visualId)
+        {
+            BuildStage();
+            for (int level = 1; level <= 3; level++)
+            {
+                var model = ctx.Models.Create(visualId, level, 2, 2);
+                model.transform.SetParent(stage, false);
+                model.transform.position = At(0f, 0f);
+                yield return Photo($"{visualId}_l{level}", At(0f, 0f) + Vector3.up * 0.55f, 1.15f);
+                if (level == 2)
+                {
+                    yield return Photo($"{visualId}_l2_front", At(0f, 0f) + Right * 0.1f + Away * -0.5f + Vector3.up * 0.4f, 0.62f);
+                    yield return Photo($"{visualId}_l2_left", At(0f, 0f) + Right * -0.6f + Away * 0.1f + Vector3.up * 0.4f, 0.62f);
+                    yield return Photo($"{visualId}_l2_roof", At(0f, 0f) + Vector3.up * 0.95f, 0.62f);
+                }
+                UnityEngine.Object.Destroy(model);
+            }
+        }
+
+        private void BuildStage()
+        {
             stage = new GameObject("Gallery").transform;
             var lawn = new GameObject("Lawn");
             lawn.transform.SetParent(stage, false);
             lawn.transform.position = stageOrigin + new Vector3(-9f, 0f, -9f);
             lawn.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.GroundQuad(18f, 18f);
             lawn.AddComponent<MeshRenderer>().sharedMaterial = ctx.Art.NoOutline(Palette.GrassLight);
-
-            yield return Actors();
-            yield return Vegetation();
         }
 
         // ------------------------------------------------------------------ actors

@@ -36,6 +36,7 @@ namespace AgeOfSakura.Game
             public Prim Prim;
             public PropFactory Props;
             public ActorFactory Actors;
+            public IBuildingModelProvider Models;
         }
 
         public static bool TryParse(out Options options)
@@ -94,12 +95,12 @@ namespace AgeOfSakura.Game
             Directory.CreateDirectory(options.OutputDirectory);
             yield return new WaitForSecondsRealtime(1.0f);
             // screenshots must not catch buildings half-way through their construction animation (the "buildin" walkthrough does on purpose)
-            BuildInAnimation.SpeedMultiplier = options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" ? 1000f : 1f;
+            BuildInAnimation.SpeedMultiplier = options.States == "galleryhouse" || options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" || options.States == "house" ? 1000f : 1f;
             if (options.States == "game") PrepareGameplayWorld();
             else if (options.States == "style") PrepareStyleWorld();
             else if (options.States == "hall") PrepareHallWorld();
-            else if (options.States == "woodcutter" || options.States == "shrine") PrepareSingleBuildingWorld();
-            else if (options.States == "gallery") { }
+            else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") PrepareSingleBuildingWorld();
+            else if (options.States == "gallery" || options.States == "galleryhouse") { }
             else PrepareWorld();
 
             foreach (var res in options.Resolutions)
@@ -110,8 +111,9 @@ namespace AgeOfSakura.Game
                 if (options.States == "game") yield return RunGameplay();
                 else if (options.States == "style") yield return RunStyle();
                 else if (options.States == "hall") yield return RunHall();
-                else if (options.States == "woodcutter" || options.States == "shrine") yield return RunSingleBuilding();
+                else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") yield return RunSingleBuilding();
                 else if (options.States == "gallery") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).Run();
+                else if (options.States == "galleryhouse") yield return new GalleryShowcase(ctx, options.OutputDirectory, log).RunBuilding("house");
                 else yield return RunStates();
             }
 
@@ -178,7 +180,7 @@ namespace AgeOfSakura.Game
 
         private string singleBuildingId;
 
-        /// <summary>Quick review of one building (-uistates woodcutter / shrine): all three looks close up, plus one wide shot of level 3.</summary>
+        /// <summary>Quick review of one building (-uistates woodcutter / shrine / house): all three looks close up, plus one wide shot of level 3.</summary>
         private IEnumerator RunSingleBuilding()
         {
             ctx.Ui.CloseAllPanels();
@@ -191,6 +193,11 @@ namespace AgeOfSakura.Game
                 ctx.Views.Rebuild(building);
                 yield return CloseUp(centre, 1.7f);
                 yield return Shot($"{prefix}{level}_close", 0.6f);
+                if (level == 2)
+                {
+                    yield return CloseUp(centre, 1.0f);
+                    yield return Shot($"{prefix}2_zoom", 0.6f);
+                }
             }
             yield return CloseUp(centre, 3.2f);
             yield return Shot($"{prefix}3_wide", 0.6f);
