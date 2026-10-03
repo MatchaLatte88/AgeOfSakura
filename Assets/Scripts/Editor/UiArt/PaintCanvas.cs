@@ -313,7 +313,7 @@ namespace AgeOfSakura.EditorTools.UiArt
         }
     }
 
-    /// <summary>The UI colour palette for baked art ("Lacquer &amp; Washi"). Runtime code uses <c>Palette</c> for the same roles.</summary>
+    /// <summary>Colours for the baked icons (glass surfaces and buttons use literal hex values in <see cref="UiArtRecipes"/>). Runtime code uses <c>Palette</c> for the same roles.</summary>
     public static class Pal
     {
         public static Color Hex(string hex)

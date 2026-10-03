@@ -3,7 +3,7 @@ using UnityEngine;
 namespace AgeOfSakura.Game
 {
     /// <summary>
-    /// world colours follow the 3D-Toon style (see ToonStyle); the UI colours below are unchanged (UI style is still an open question in the style document).
+    /// world colours follow the 3D-Toon style (see ToonStyle); the UI colours below follow the compact frosted-glass UI (documented in the README).
     /// Colours live here (not scattered through builders) so the look can be tuned in one place.
     /// </summary>
     public static class Palette
@@ -61,20 +61,17 @@ namespace AgeOfSakura.Game
         public static readonly Color KimonoMoss = Hex("#5F8248");
         public static readonly Color Sash = Hex("#E2D4B2");
 
-        // ---- UI ----
-        public static readonly Color Cream = Hex("#FFF4D8");
-        public static readonly Color GoldInlay = Hex("#E8BE55");
-        public static readonly Color Parchment = Hex("#EADFC4");
-        public static readonly Color ParchmentDark = Hex("#D8C8A4");
-        public static readonly Color Ink = Hex("#33261C");
-        public static readonly Color InkSoft = Hex("#5A4838");
-        public static readonly Color UiGreen = Hex("#5F8646");
-        public static readonly Color UiGreenDark = Hex("#48693A");
-        public static readonly Color UiGold = Hex("#C9A04A");
-        public static readonly Color UiGoldDark = Hex("#A57F33");
-        public static readonly Color UiRed = Hex("#B0473A");
-        public static readonly Color UiDisabled = Hex("#B9AE96");
-        public static readonly Color UiDiamond = Hex("#4CA6C8");
+        // ---- UI (compact frosted glass; the same palette family as the VoxelHaven HUD) ----
+        public static readonly Color Cream = Hex("#FFF8EA");        // text on dark glass and on colour
+        public static readonly Color CreamDeep = Hex("#F3EAD6");    // chips, tiles
+        public static readonly Color CreamLine = Hex("#E6DAC0");    // hairlines, empty tracks
+        public static readonly Color Ink = Hex("#4A3426");
+        public static readonly Color InkSoft = Hex("#7A624E");
+        public static readonly Color UiGreen = Hex("#5E9E4A");
+        public static readonly Color UiGreenDark = Hex("#3F7A33");
+        public static readonly Color UiGold = Hex("#E2B23C");
+        public static readonly Color UiRed = Hex("#D9604C");
+        public static readonly Color UiRedSoft = Hex("#F6D6CE");
 
         // ---- placement ----
         public static readonly Color ValidFill = new Color(0.36f, 0.78f, 0.36f, 0.55f);

@@ -12,28 +12,29 @@ namespace AgeOfSakura.Game
 
         public DebugMenuView(UiKit kit, RectTransform safeArea, DebugCommands commands, ToastView toast)
         {
-            var gear = kit.Button(safeArea, "DebugGear", string.Empty, new Vector2(UiTheme.TouchMin + 8f, UiTheme.TouchMin + 8f), UiButtonStyle.Dark, kit.Icons.Get("gear"), iconOnly: true);
-            UiKit.Place(gear.Rect, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-34f, -26f), new Vector2(UiTheme.TouchMin + 8f, UiTheme.TouchMin + 8f));
+            const float gearSize = 84f;
+            var gear = kit.IconButton(safeArea, "DebugGear", "gear", gearSize, UiButtonStyle.Dark);
+            UiKit.Place(gear.Rect, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-UiTheme.Gutter, -(24f + (UiTheme.BarHeight - gearSize) * 0.5f)), new Vector2(gearSize, gearSize));
             gearButton = gear.GameObject;
 
-            var window = kit.Sliced(safeArea, "DebugPanel", "panel_lacquer", true);
+            var window = kit.Glass(safeArea, "DebugPanel", "panel_light", UiTheme.PanelRadius);
             panel = window.gameObject;
             UiKit.AddShadow(window.gameObject, -10f, 0.4f);
-            UiKit.Place(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1140f, 860f));
+            UiKit.Place(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1060f, 560f));
 
-            var column = kit.Column(window.transform, "Content", 16f, TextAnchor.UpperCenter, 70, 56, 70, 50);
+            var column = kit.Column(window.transform, "Content", 14f, TextAnchor.UpperCenter, 36, 28, 36, 28);
             UiKit.Stretch(column);
 
-            var title = kit.Text(column, "Debug (development only)", TextStyle.Light, 52, Palette.Cream, TextAlignmentOptions.Center, FontStyles.Bold, "Title");
-            UiKit.Size(title.gameObject, height: 70f);
+            var title = kit.Text(column, "Debug (development only)", UiTheme.FontHeading, Palette.Ink, TextAlignmentOptions.Center, FontStyles.Bold, "Title");
+            UiKit.Size(title.gameObject, height: 56f);
 
             var grid = kit.Empty(column, "Buttons");
             var layout = grid.AddComponent<GridLayoutGroup>();
-            layout.cellSize = new Vector2(310f, 110f);
-            layout.spacing = new Vector2(24f, 16f);
+            layout.cellSize = new Vector2(310f, 84f);
+            layout.spacing = new Vector2(16f, 14f);
             layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             layout.constraintCount = 3;
-            UiKit.Size(grid.gameObject, height: 3 * 110f + 2 * 16f, flexHeight: 1f);
+            UiKit.Size(grid.gameObject, height: 3 * 84f + 2 * 14f, flexHeight: 1f);
 
             AddAction(kit, grid.transform, "+1000 Coins", () => commands.AddCoins());
             AddAction(kit, grid.transform, "+1000 Wood", () => commands.AddWood());
@@ -46,7 +47,7 @@ namespace AgeOfSakura.Game
             var reset = AddAction(kit, grid.transform, "Reset save", () => commands.ResetSave());
             reset.SetStyle(UiButtonStyle.Danger);
 
-            var close = kit.Button(column, "Close", "Close", new Vector2(380f, UiTheme.TouchMin), UiButtonStyle.Secondary, null, 42);
+            var close = kit.Button(column, "Close", "Close", new Vector2(320f, UiTheme.TouchMin), UiButtonStyle.Secondary, null, UiTheme.FontBody);
             close.OnClick(() => panel.SetActive(false));
 
             gear.OnClick(() => panel.SetActive(!panel.activeSelf));
@@ -55,7 +56,7 @@ namespace AgeOfSakura.Game
 
         private static UiButton AddAction(UiKit kit, Transform parent, string label, System.Action action)
         {
-            var b = kit.Button(parent, label, label, new Vector2(470f, 110f), UiButtonStyle.Secondary, null, 36);
+            var b = kit.Button(parent, label, label, new Vector2(310f, 84f), UiButtonStyle.Secondary, null, UiTheme.FontBody - 6);
             b.OnClick(action);
             return b;
         }

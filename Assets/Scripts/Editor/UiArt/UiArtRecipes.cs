@@ -15,8 +15,9 @@ namespace AgeOfSakura.EditorTools.UiArt
     }
 
     /// <summary>
-    /// Recipes for every baked UI sprite. Art direction: "Lacquer and Washi" - dark warm lacquer frames with a thin gold inlay,
-    /// washi paper surfaces, chunky lit icons with dark outlines, everything lit from the top. Authored at 2x (PPU 200).
+    /// Recipes for every baked UI sprite. Art direction: compact frosted glass (same family as the VoxelHaven HUD) - translucent
+    /// cream and dark-brown surfaces with a light upper edge, flat gradient buttons, chunky outlined icons for the content.
+    /// Authored at 2x (PPU 200); pills and panels are 9-sliced and rounded to size at runtime (<c>UiKit.Round</c>).
     /// </summary>
     public static class UiArtRecipes
     {
@@ -53,42 +54,29 @@ namespace AgeOfSakura.EditorTools.UiArt
             yield return Icon("upgrade", Upgrade);
             yield return Icon("lock", Lock);
             yield return Icon("clock", Clock);
-            yield return Icon("bubble", () => Bubble(false));
-            yield return Icon("bubble_tail", () => Bubble(true));
-            yield return Icon("badge", Badge);
+            yield return Icon("bubble", Bubble);
             yield return Icon("alert", Alert);
-            yield return new ArtEntry { Id = "tail_paper", Make = TailPaper, Mipmaps = false };
-            yield return Icon("medallion", Medallion);
 
             // ---- effects
             yield return Icon("glow", Glow);
             yield return Icon("sparkle", Sparkle);
-            yield return Icon("rays", Rays);
-            yield return Icon("shine", Shine);
-            yield return new ArtEntry { Id = "vignette", Make = Vignette, Mipmaps = false };
-            yield return new ArtEntry { Id = "fade_top", Make = () => EdgeFade(true), Mipmaps = false };
-            yield return new ArtEntry { Id = "fade_bottom", Make = () => EdgeFade(false), Mipmaps = false };
-            yield return new ArtEntry { Id = "paper_noise", Make = PaperNoise, Repeat = true, Mipmaps = true };
 
-            // ---- panels, chips, bars (9-slice)
-            yield return new ArtEntry { Id = "panel_paper", Make = () => Panel(false), Border = new Vector4(110, 110, 110, 110), Mipmaps = false };
-            yield return new ArtEntry { Id = "panel_lacquer", Make = () => Panel(true), Border = new Vector4(110, 110, 110, 110), Mipmaps = false };
-            yield return new ArtEntry { Id = "plaque", Make = Plaque, Border = new Vector4(120, 80, 120, 80), Mipmaps = false };
-            yield return new ArtEntry { Id = "pill_lacquer", Make = () => Pill(true), Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
-            yield return new ArtEntry { Id = "pill_paper", Make = () => Pill(false), Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
-            yield return new ArtEntry { Id = "card_paper", Make = () => Card(0), Border = new Vector4(80, 80, 80, 80), Mipmaps = false };
-            yield return new ArtEntry { Id = "card_locked", Make = () => Card(1), Border = new Vector4(80, 80, 80, 80), Mipmaps = false };
+            // ---- surfaces, chips, bars (9-slice; the corner radius in pixels is the border, see UiKit.Round)
+            yield return new ArtEntry { Id = "panel_light", Make = () => GlassLight(256, 256, 80), Border = new Vector4(80, 80, 80, 80), Mipmaps = false };
+            yield return new ArtEntry { Id = "pill_light", Make = () => GlassLight(256, 128, 64), Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
+            yield return new ArtEntry { Id = "pill_dark", Make = () => GlassDark(256, 128, 64), Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
+            yield return new ArtEntry { Id = "pill_flat", Make = FlatPill, Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
+            yield return new ArtEntry { Id = "card_light", Make = () => Card(false), Border = new Vector4(56, 56, 56, 56), Mipmaps = false };
+            yield return new ArtEntry { Id = "card_locked", Make = () => Card(true), Border = new Vector4(56, 56, 56, 56), Mipmaps = false };
             yield return new ArtEntry { Id = "trough", Make = Trough, Border = new Vector4(36, 32, 36, 32), Mipmaps = false };
-            yield return new ArtEntry { Id = "bar_green", Make = () => BarFill(Pal.GreenLight, Pal.Green, Pal.GreenDeep), Border = new Vector4(36, 32, 36, 32), Mipmaps = false };
-            yield return new ArtEntry { Id = "bar_gold", Make = () => BarFill(Pal.GoldLight, Pal.Gold, Pal.GoldDeep), Border = new Vector4(36, 32, 36, 32), Mipmaps = false };
-            yield return new ArtEntry { Id = "divider", Make = Divider, Border = new Vector4(200, 0, 200, 0), Mipmaps = false };
+            yield return new ArtEntry { Id = "bar_green", Make = () => BarFill(H("#86C868"), H("#5E9E4A")), Border = new Vector4(36, 32, 36, 32), Mipmaps = false };
+            yield return new ArtEntry { Id = "bar_gold", Make = () => BarFill(H("#F6D472"), H("#E2B23C")), Border = new Vector4(36, 32, 36, 32), Mipmaps = false };
 
-            // ---- buttons: face + depth per style
+            // ---- buttons: one flat face per style
             foreach (var style in ButtonStyles())
             {
                 var s = style;
-                yield return new ArtEntry { Id = "btn_" + s.Name, Make = () => ButtonFace(s), Border = new Vector4(84, 84, 84, 84), Mipmaps = false };
-                yield return new ArtEntry { Id = "btn_" + s.Name + "_depth", Make = () => ButtonDepth(s), Border = new Vector4(84, 84, 84, 84), Mipmaps = false };
+                yield return new ArtEntry { Id = "btn_" + s.Name, Make = () => ButtonFace(s), Border = new Vector4(64, 64, 64, 64), Mipmaps = false };
             }
         }
 
@@ -220,12 +208,11 @@ namespace AgeOfSakura.EditorTools.UiArt
             return c.ToTexture();
         }
 
-        private static Texture2D Glyph(Func<Sdf> shape, float shadow = 0.42f)
+        /// <summary>Flat white glyph; the UI tints it (ink on paper, white on colour), so it carries no shadow of its own.</summary>
+        private static Texture2D Glyph(Func<Sdf> shape)
         {
             var c = new PaintCanvas(256, 256, 3);
-            var s = shape();
-            c.Shadow(s, 0, -9, 10, shadow);
-            c.Fill(s, Sh.V(230, 26, Color.white, H("#E7EEDC")));
+            c.Fill(shape(), Sh.Solid(Color.white));
             return c.ToTexture();
         }
 
@@ -569,11 +556,19 @@ namespace AgeOfSakura.EditorTools.UiArt
             return c.ToTexture();
         }
 
-        private static Texture2D Noise() => Glyph(() =>
+        /// <summary>Need/effect icon "Noise": a speaker with two sound waves. Coloured like the other content icons (the flat glyphs are tinted by the UI and would vanish on a cream card).</summary>
+        private static Texture2D Noise()
         {
+            var c = new PaintCanvas(256, 256, 3);
             var body = Sd.Poly(P(34, 100, 84, 100, 134, 62, 134, 194, 84, 156, 34, 156), 6);
-            return Sd.Union(body, Sd.Arc(134, 128, 52, 16, -50, 50), Sd.Arc(134, 128, 92, 16, -50, 50));
-        });
+            var near = Sd.Arc(134, 128, 52, 18, -50, 50);
+            var far = Sd.Arc(134, 128, 92, 18, -50, 50);
+            c.Shadow(Sd.Union(body, near, far), 3, -9, 14, 0.38f);
+            c.Outlined(far, Pal.Outline, 5, Sh.V(200, 56, H("#FFC77A"), H("#E88A2E")));
+            c.Outlined(near, Pal.Outline, 5, Sh.V(180, 76, H("#FFC77A"), H("#E88A2E")));
+            c.Outlined(body, Pal.Outline, 7, Sh.V(194, 62, H("#E7DCC0"), H("#A99A78")));
+            return c.ToTexture();
+        }
 
         private static Texture2D Faith()
         {
@@ -629,66 +624,23 @@ namespace AgeOfSakura.EditorTools.UiArt
             return c.ToTexture();
         }
 
-        private static Texture2D Bubble(bool withTail)
+        /// <summary>World marker disc above a building (ready / upgrade / producing): a clean cream disc with a soft rim.</summary>
+        private static Texture2D Bubble()
         {
-            int h = withTail ? 300 : 256;
-            var c = new PaintCanvas(256, h, 3);
-            float cy = withTail ? 172f : 128f;
-            var round = Sd.Circle(128, cy, 112);
-            Sdf shape = round;
-            if (withTail) shape = Sd.Union(round, Sd.Poly(P(92, 84, 164, 84, 128, 22), 6));
-            c.Shadow(shape, 3, -9, 14, 0.4f);
-            c.Fill(Sd.Inflate(shape, 0), Sh.Solid(Pal.Outline));
-            Sdf ring = Sd.Inflate(shape, -8);
-            c.Fill(ring, Sh.Lit(cy + 104, cy - 104, Pal.GoldLight, Pal.GoldDeep, new Color(1, 1, 1, 0.9f), Pal.A(Pal.GoldDark, 0.7f), 10));
-            Sdf inner = Sd.Inflate(shape, -22);
-            c.Fill(inner, Sh.V(cy + 90, cy - 90, H("#FFFBEC"), H("#F1E3C0")));
-            c.Fill(inner, (x, y, d) => new Color(0.4f, 0.25f, 0.1f, 0.2f * Mathf.Clamp01(1 + d / 16f) * Mathf.Clamp01((y - cy) / 120f + 0.4f)));
-            return c.ToTexture();
-        }
-
-        private static Texture2D Badge()
-        {
-            var c = new PaintCanvas(128, 128, 3);
-            var disc = Sd.Circle(64, 64, 52);
-            c.Shadow(disc, 1, -4, 6, 0.4f);
-            c.Fill(Sd.Inflate(disc, 6), Sh.Solid(Color.white));
-            c.Fill(disc, Sh.Lit(116, 12, Pal.RedLight, Pal.RedDeep, new Color(1, 1, 1, 0.5f), Pal.A(Pal.RedDark, 0.7f), 8));
-            c.Fill(Sd.Inter(Sd.Sub(Sd.Circle(50, 82, 32), Sd.Circle(58, 74, 32)), disc), Sh.Solid(new Color(1, 1, 1, 0.5f)));
+            var c = new PaintCanvas(256, 256, 3);
+            var disc = Sd.Circle(128, 128, 112);
+            c.Shadow(disc, 0, -7, 12, 0.3f);
+            c.Fill(disc, Sh.Solid(H("#D9CBAE")));
+            c.Fill(Sd.Inflate(disc, -5), Sh.V(240, 16, H("#FFFFFF"), H("#F3EAD6")));
             return c.ToTexture();
         }
 
         private static Texture2D Alert()
         {
             var c = new PaintCanvas(128, 128, 3);
-            var disc = Sd.Circle(64, 64, 54);
-            c.Shadow(disc, 1, -4, 6, 0.4f);
-            c.Outlined(disc, Pal.RedDark, 5, Sh.Lit(118, 10, Pal.RedLight, Pal.RedDeep, new Color(1, 1, 1, 0.5f), Pal.A(Pal.RedDark, 0.7f), 8));
-            c.Fill(Sd.Capsule(64, 50, 64, 82, 8), Sh.Solid(Color.white));
+            c.Fill(Sd.Circle(64, 64, 56), Sh.V(120, 8, H("#E77A64"), H("#D9604C")));
+            c.Fill(Sd.Capsule(64, 52, 64, 84, 8), Sh.Solid(Color.white));
             c.Fill(Sd.Circle(64, 32, 8.5f), Sh.Solid(Color.white));
-            return c.ToTexture();
-        }
-
-        private static Texture2D TailPaper()
-        {
-            var c = new PaintCanvas(128, 96, 3);
-            var tri = Sd.Poly(P(14, 96, 114, 96, 64, 10), 8);
-            c.Shadow(tri, 1, -4, 6, 0.3f);
-            c.Fill(Sd.Inflate(tri, 0), Sh.Solid(Pal.LacquerDeep));
-            c.Fill(Sd.Inflate(tri, -7), Sh.V(96, 10, Pal.PaperLight, Pal.PaperDeep));
-            return c.ToTexture();
-        }
-
-        private static Texture2D Medallion()
-        {
-            var c = new PaintCanvas(256, 256, 3);
-            var disc = Sd.Circle(128, 128, 116);
-            c.Shadow(disc, 2, -8, 12, 0.4f);
-            c.Fill(disc, Sh.Solid(Pal.Outline));
-            c.Fill(Sd.Circle(128, 128, 108), Sh.Lit(236, 20, Pal.GoldLight, Pal.GoldDeep, new Color(1, 1, 1, 0.9f), Pal.A(Pal.GoldDark, 0.7f), 12));
-            var inner = Sd.Circle(128, 128, 90);
-            c.Fill(inner, Sh.V(218, 38, H("#FFFBEC"), H("#EBDCB6")));
-            c.Fill(inner, (x, y, d) => new Color(0.4f, 0.25f, 0.1f, 0.24f * Mathf.Clamp01(1 + d / 18f) * Mathf.Clamp01((y - 128) / 130f + 0.45f)));
             return c.ToTexture();
         }
 
@@ -713,231 +665,59 @@ namespace AgeOfSakura.EditorTools.UiArt
             return c.ToTexture();
         }
 
-        private static Texture2D Rays()
+        // ===================================================================== surfaces (9-slice)
+
+        /// <summary>Translucent cream glass: slightly lighter at the top, bright upper edge. <paramref name="radius"/> is in pixels.</summary>
+        private static Texture2D GlassLight(int w, int h, float radius)
         {
-            var c = new PaintCanvas(256, 256, 2);
-            var parts = new List<Sdf>();
-            for (int i = 0; i < 12; i++)
-            {
-                float a = i * Mathf.PI / 6f;
-                var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                var n = new Vector2(-d.y, d.x);
-                parts.Add(Sd.Poly(new[] { new Vector2(128, 128) + n * 5f, new Vector2(128, 128) - n * 5f, new Vector2(128, 128) + d * 128f - n * 14f, new Vector2(128, 128) + d * 128f + n * 14f }));
-            }
-            c.Fill(Sd.Union(parts.ToArray()), (x, y, d) =>
-            {
-                float r = Mathf.Sqrt((x - 128) * (x - 128) + (y - 128) * (y - 128)) / 128f;
-                return new Color(1, 1, 1, Mathf.Clamp01(1f - r) * Mathf.Clamp01(r * 6f) * 0.9f);
-            });
+            var c = new PaintCanvas(w, h, 2);
+            var shape = Sd.Box(w * 0.5f, h * 0.5f, w * 0.5f - 1f, h * 0.5f - 1f, radius);
+            c.Fill(shape, Sh.V(h, 0, Pal.A(H("#FFFCF6"), 0.975f), Pal.A(H("#FAF1E0"), 0.955f)));
+            c.Fill(Sd.Edge(Sd.Inflate(shape, -1.5f), 3f), Sh.V(h, 0, new Color(1, 1, 1, 0.95f), new Color(1, 1, 1, 0.35f)));
             return c.ToTexture();
         }
 
-        private static Texture2D Shine()
+        /// <summary>Translucent dark-brown glass for what floats over the world (resource bar, toast, pop-ups).</summary>
+        private static Texture2D GlassDark(int w, int h, float radius)
         {
-            var c = new PaintCanvas(128, 128, 2);
-            c.Fill(Sd.Poly(P(40, 0, 92, 0, 128, 128, 76, 128)), (x, y, d) => new Color(1, 1, 1, 0.55f * Mathf.Clamp01(1f + d / 10f)));
+            var c = new PaintCanvas(w, h, 2);
+            var shape = Sd.Box(w * 0.5f, h * 0.5f, w * 0.5f - 1f, h * 0.5f - 1f, radius);
+            c.Fill(shape, Sh.V(h, 0, Pal.A(H("#40332A"), 0.80f), Pal.A(H("#33271F"), 0.86f)));
+            c.Fill(Sd.Edge(Sd.Inflate(shape, -1.5f), 3f), Sh.V(h, 0, new Color(1, 1, 1, 0.24f), new Color(1, 1, 1, 0.05f)));
             return c.ToTexture();
         }
 
-        private static Texture2D Vignette()
+        /// <summary>Plain white pill that the UI tints (chips, tracks, flashes).</summary>
+        private static Texture2D FlatPill()
         {
-            var tex = new Texture2D(128, 128, TextureFormat.RGBA32, false);
-            var px = new Color[128 * 128];
-            for (int y = 0; y < 128; y++)
-            {
-                for (int x = 0; x < 128; x++)
-                {
-                    float dx = (x + 0.5f) / 128f * 2f - 1f, dy = (y + 0.5f) / 128f * 2f - 1f;
-                    float r = Mathf.Sqrt(dx * dx * 0.9f + dy * dy * 1.15f);
-                    float a = Mathf.Clamp01((r - 0.62f) / 0.75f);
-                    px[y * 128 + x] = new Color(0.08f, 0.05f, 0.03f, a * a * 0.55f);
-                }
-            }
-            tex.SetPixels(px);
-            tex.Apply(false);
-            return tex;
-        }
-
-        private static Texture2D EdgeFade(bool top)
-        {
-            var tex = new Texture2D(4, 128, TextureFormat.RGBA32, false);
-            var px = new Color[4 * 128];
-            for (int y = 0; y < 128; y++)
-            {
-                float t = top ? (y / 127f) : 1f - y / 127f; // 1 at the screen edge
-                float a = t * t * 0.55f;
-                for (int x = 0; x < 4; x++) px[y * 4 + x] = new Color(0.1f, 0.06f, 0.03f, a);
-            }
-            tex.SetPixels(px);
-            tex.Apply(false);
-            return tex;
-        }
-
-        private static Texture2D PaperNoise()
-        {
-            const int n = 128;
-            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
-            var px = new Color[n * n];
-            for (int y = 0; y < n; y++)
-            {
-                for (int x = 0; x < n; x++)
-                {
-                    float v = Tile(x / (float)n * 8f, y / (float)n * 8f, 8) * 0.55f + Tile(x / (float)n * 24f, y / (float)n * 24f, 24) * 0.45f;
-                    float fibre = Tile(x / (float)n * 3f, y / (float)n * 40f, 3, 40);
-                    px[y * n + x] = new Color(0.45f, 0.3f, 0.12f, Mathf.Clamp01(v * 0.10f + fibre * 0.05f));
-                }
-            }
-            tex.SetPixels(px);
-            tex.Apply(false);
-            return tex;
-        }
-
-        private static float Tile(float x, float y, int period, int periodY = -1)
-        {
-            if (periodY < 0) periodY = period;
-            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
-            float tx = x - x0, ty = y - y0;
-            tx = tx * tx * (3f - 2f * tx);
-            ty = ty * ty * (3f - 2f * ty);
-            float H2(int ix, int iy)
-            {
-                ix = ((ix % period) + period) % period;
-                iy = ((iy % periodY) + periodY) % periodY;
-                return Sh.Value(ix * 3.7f + 0.5f, iy * 5.1f + 0.5f);
-            }
-            return Mathf.Lerp(Mathf.Lerp(H2(x0, y0), H2(x0 + 1, y0), tx), Mathf.Lerp(H2(x0, y0 + 1), H2(x0 + 1, y0 + 1), tx), ty);
-        }
-
-        // ===================================================================== panels / chips / bars (9-slice)
-
-        private static Texture2D Panel(bool dark)
-        {
-            var c = new PaintCanvas(512, 512, 2);
-            var outer = Sd.Box(256, 256, 254, 254, 70);
-            c.Fill(outer, Sh.Lit(510, 2, Pal.LacquerTop, Pal.LacquerDeep, Pal.A(Pal.LacquerRim, 0.95f), Pal.A(Color.black, 0.5f), 7));
-            c.Fill(Sd.Edge(Sd.Box(256, 256, 238, 238, 56), 4), Sh.V(494, 18, Pal.GoldLight, Pal.GoldDeep), 0.95f);
-            c.Fill(Sd.Edge(Sd.Box(256, 256, 232, 232, 52), 1.6f), Sh.Solid(Pal.A(Color.black, 0.35f)));
-            var inner = Sd.Box(256, 256, 224, 224, 44);
-            if (dark)
-            {
-                c.Fill(inner, Sh.V(480, 32, H("#3E2E25"), H("#221812")));
-                c.Fill(inner, (x, y, d) => new Color(1, 1, 1, 0.06f * Mathf.Clamp01((y - 256) / 240f) * Mathf.Clamp01(1 + d / 40f)));
-            }
-            else
-            {
-                c.Fill(inner, Sh.V(480, 32, Pal.PaperLight, Pal.PaperDeep));
-                c.Fill(inner, Sh.Noise(Pal.A(Pal.PaperEdge, 1f), 0.05f, 0.5f), 0.32f);
-                c.Fill(inner, (x, y, d) => new Color(0.36f, 0.22f, 0.08f, 0.26f * Mathf.Clamp01(1 + d / 22f) * Mathf.Clamp01((y - 200) / 250f + 0.25f)));
-                c.Fill(Sd.Edge(Sd.Box(256, 256, 224, 224, 44), 3), Sh.Solid(Pal.A(Pal.PaperEdge, 0.7f)), 0.8f);
-            }
-            if (dark)
-            {
-                foreach (var corner in new[] { new Vector2(52, 52), new Vector2(460, 52), new Vector2(52, 460), new Vector2(460, 460) })
-                    c.Fill(Sd.Circle(corner.x, corner.y, 5), Sh.V(corner.y + 5, corner.y - 5, Pal.GoldLight, Pal.GoldDeep), 0.9f);
-            }
-            else
-            {
-                // blossoms tucked into two opposite corners
-                // only inside the 110 px corner regions, otherwise the 9-slice stretches them into streaks
-                Blossom(c, 58, 454, 46, 12);
-                Blossom(c, 454, 58, 46, 50);
-                foreach (var corner in new[] { new Vector2(460, 460), new Vector2(52, 52) })
-                    c.Fill(Sd.Circle(corner.x, corner.y, 5), Sh.V(corner.y + 5, corner.y - 5, Pal.GoldLight, Pal.GoldDeep), 0.9f);
-            }
+            var c = new PaintCanvas(256, 128, 2);
+            c.Fill(Sd.Box(128, 64, 127, 63, 63), Sh.Solid(Color.white));
             return c.ToTexture();
         }
 
-        /// <summary>Title plaque that overhangs the top edge of the bottom sheet: dark lacquer, gold inlay, gilded end lugs.</summary>
-        private static Texture2D Plaque()
+        /// <summary>Tappable tile on a light panel: flat cream with a fine edge. The locked variant is greyer.</summary>
+        private static Texture2D Card(bool locked)
         {
-            var c = new PaintCanvas(512, 192, 2);
-            var outer = Sd.Box(256, 96, 254, 94, 64);
-            c.Shadow(outer, 0, -6, 8, 0.25f);
-            c.Fill(outer, Sh.Lit(190, 2, Pal.LacquerTop, Pal.LacquerDeep, Pal.A(Pal.LacquerRim, 0.95f), Pal.A(Color.black, 0.5f), 7));
-            c.Fill(Sd.Edge(Sd.Box(256, 96, 240, 80, 52), 4), Sh.V(180, 12, Pal.GoldLight, Pal.GoldDeep), 0.95f);
-            var body = Sd.Box(256, 96, 232, 72, 46);
-            c.Fill(body, Sh.V(168, 24, H("#3F2F26"), H("#1F1610")));
-            c.Fill(Sd.Inter(body, Sd.HalfAbove(100)), Sh.V(168, 100, new Color(1, 1, 1, 0.12f), new Color(1, 1, 1, 0.01f)));
-            foreach (float x in new[] { 40f, 472f }) c.Fill(Sd.Circle(x, 96, 8), Sh.V(104, 88, Pal.GoldLight, Pal.GoldDeep));
+            var c = new PaintCanvas(192, 192, 2);
+            c.Fill(Sd.Box(96, 96, 95, 95, 56), Sh.Solid(locked ? H("#D8CFBA") : H("#E6DAC0")));
+            c.Fill(Sd.Box(96, 96, 93, 93, 54), locked ? Sh.V(192, 0, H("#E9E2D2"), H("#E0D8C6")) : Sh.V(192, 0, H("#F8F0DE"), H("#F0E5CC")));
             return c.ToTexture();
         }
 
-        private static Texture2D Pill(bool dark)
-        {
-            var c = new PaintCanvas(384, 128, 2);
-            var cap = Sd.Box(192, 64, 190, 62, 62);
-            if (dark)
-            {
-                c.Fill(cap, Sh.Lit(126, 2, Pal.LacquerTop, Pal.LacquerDeep, Pal.A(Pal.LacquerRim, 0.9f), Pal.A(Color.black, 0.5f), 6));
-                c.Fill(Sd.Edge(Sd.Box(192, 64, 184, 56, 56), 3.2f), Sh.V(120, 8, Pal.GoldLight, Pal.GoldDeep), 0.95f);
-                var body = Sd.Box(192, 64, 178, 50, 50);
-                c.Fill(body, Sh.V(114, 14, H("#3B2B22"), H("#1D140F")));
-                c.Fill(Sd.Inter(body, Sd.HalfAbove(66)), Sh.V(114, 66, new Color(1, 1, 1, 0.13f), new Color(1, 1, 1, 0.02f)));
-                c.Fill(body, (x, y, d) => new Color(0, 0, 0, 0.35f * Mathf.Clamp01(1 + d / 12f) * Mathf.Clamp01((64 - y) / 60f + 0.2f)));
-            }
-            else
-            {
-                c.Fill(cap, Sh.Lit(126, 2, H("#5A4437"), Pal.LacquerDeep, Pal.A(Pal.LacquerRim, 0.9f), Pal.A(Color.black, 0.5f), 6));
-                c.Fill(Sd.Edge(Sd.Box(192, 64, 184, 56, 56), 3f), Sh.V(120, 8, Pal.GoldLight, Pal.GoldDeep), 0.9f);
-                var body = Sd.Box(192, 64, 178, 50, 50);
-                c.Fill(body, Sh.V(114, 14, Pal.PaperLight, Pal.PaperDeep));
-                c.Fill(body, (x, y, d) => new Color(0.36f, 0.22f, 0.08f, 0.22f * Mathf.Clamp01(1 + d / 14f) * Mathf.Clamp01((y - 40) / 80f + 0.3f)));
-            }
-            return c.ToTexture();
-        }
-
-        private static Texture2D Card(int variant)
-        {
-            var c = new PaintCanvas(256, 256, 2);
-            var outer = Sd.Box(128, 128, 126, 126, 56);
-            bool locked = variant == 1;
-            c.Fill(outer, Sh.Solid(locked ? H("#8F8672") : Pal.PaperEdge));
-            var body = Sd.Box(128, 128, 120, 120, 50);
-            c.Fill(body, locked ? Sh.V(248, 8, H("#DCD3BE"), H("#BDB299")) : Sh.V(248, 8, H("#FFF9EA"), H("#EEDFBB")));
-            if (!locked) c.Fill(body, Sh.Noise(Pal.A(Pal.PaperEdge, 1f), 0.06f, 0.5f), 0.3f);
-            c.Fill(body, (x, y, d) => new Color(0.36f, 0.22f, 0.08f, 0.2f * Mathf.Clamp01(1 + d / 16f) * Mathf.Clamp01((y - 90) / 150f + 0.15f)));
-            c.Fill(Sd.Inter(Sd.Edge(Sd.Box(128, 128, 116, 116, 46), 3), Sd.HalfAbove(150)), Sh.Solid(new Color(1, 1, 1, 0.55f)));
-            return c.ToTexture();
-        }
-
+        /// <summary>Dark track of the in-world progress bar.</summary>
         private static Texture2D Trough()
         {
             var c = new PaintCanvas(256, 64, 3);
             var cap = Sd.Box(128, 32, 127, 31, 31);
-            c.Fill(cap, Sh.Solid(Pal.A(Pal.LacquerDeep, 1f)));
-            c.Fill(Sd.Box(128, 31, 123, 27, 27), Sh.V(58, 4, H("#221510"), H("#3A2A21")));
-            c.Fill(Sd.Box(128, 31, 123, 27, 27), (x, y, d) => new Color(0, 0, 0, 0.5f * Mathf.Clamp01(1 + d / 9f) * Mathf.Clamp01((y - 20) / 30f)));
-            c.Fill(Sd.Inter(Sd.Edge(Sd.Box(128, 32, 125, 29, 29), 2.4f), Sd.HalfBelow(32)), Sh.Solid(Pal.A(Pal.GoldLight, 0.35f)));
+            c.Fill(cap, Sh.Solid(Pal.A(H("#33271F"), 0.85f)));
+            c.Fill(Sd.Edge(Sd.Inflate(cap, -1f), 2f), Sh.Solid(new Color(1, 1, 1, 0.18f)));
             return c.ToTexture();
         }
 
-        private static Texture2D BarFill(Color light, Color mid, Color deep)
+        private static Texture2D BarFill(Color top, Color bottom)
         {
             var c = new PaintCanvas(256, 64, 3);
-            var cap = Sd.Box(128, 32, 127, 31, 31);
-            c.Fill(cap, Sh.Solid(Pal.A(deep, 1f)));
-            var body = Sd.Box(128, 32, 124, 28, 28);
-            c.Fill(body, Sh.Lit(62, 2, light, deep, new Color(1, 1, 1, 0.55f), Pal.A(Color.black, 0.25f), 7));
-            c.Fill(Sd.Inter(Sd.Box(128, 40, 112, 14, 14), Sd.HalfAbove(34)), Sh.V(56, 34, new Color(1, 1, 1, 0.5f), new Color(1, 1, 1, 0.08f)));
-            for (int i = -2; i < 12; i++)
-            {
-                float x = i * 26f;
-                c.Fill(Sd.Inter(Sd.Poly(P(x, 4, x + 12, 4, x + 30, 60, x + 18, 60)), body), Sh.Solid(new Color(1, 1, 1, 0.07f)));
-            }
-            return c.ToTexture();
-        }
-
-        private static Texture2D Divider()
-        {
-            var c = new PaintCanvas(512, 24, 3);
-            c.Fill(Sd.Rect(30, 10, 482, 14, 2), (x, y, d) =>
-            {
-                float t = Mathf.Abs(x - 256f) / 226f;
-                return new Color(Pal.Gold.r, Pal.Gold.g, Pal.Gold.b, Mathf.Clamp01(1.4f - t * 1.5f));
-            });
-            var diamond = Sd.Poly(P(256, 22, 270, 12, 256, 2, 242, 12));
-            c.Fill(Sd.Inflate(diamond, 2), Sh.Solid(Pal.GoldDark));
-            c.Fill(diamond, Sh.V(22, 2, Pal.GoldLight, Pal.GoldDeep));
+            c.Fill(Sd.Box(128, 32, 127, 31, 31), Sh.V(64, 0, top, bottom));
             return c.ToTexture();
         }
 
@@ -946,37 +726,26 @@ namespace AgeOfSakura.EditorTools.UiArt
         public sealed class ButtonStyleDef
         {
             public string Name;
-            public Color Light, Mid, Deep, Outline;
+            public Color Top, Bottom, Edge;
         }
 
         private static IEnumerable<ButtonStyleDef> ButtonStyles()
         {
-            yield return new ButtonStyleDef { Name = "green", Light = H("#B3DE7A"), Mid = Pal.Green, Deep = Pal.GreenDeep, Outline = Pal.GreenDark };
-            yield return new ButtonStyleDef { Name = "gold", Light = H("#FFE9A6"), Mid = Pal.Gold, Deep = Pal.GoldDeep, Outline = Pal.GoldDark };
-            yield return new ButtonStyleDef { Name = "red", Light = H("#F58F70"), Mid = Pal.Red, Deep = Pal.RedDeep, Outline = Pal.RedDark };
-            yield return new ButtonStyleDef { Name = "paper", Light = H("#FFFBEC"), Mid = H("#F1E4C4"), Deep = H("#DCC898"), Outline = H("#8A7350") };
-            yield return new ButtonStyleDef { Name = "disabled", Light = H("#D9D1BD"), Mid = H("#B9B098"), Deep = H("#958C74"), Outline = H("#5F5844") };
-            yield return new ButtonStyleDef { Name = "dark", Light = H("#5B4739"), Mid = Pal.Lacquer, Deep = Pal.LacquerDeep, Outline = H("#120B08") };
+            var light = new Color(1, 1, 1, 0.28f);
+            yield return new ButtonStyleDef { Name = "green", Top = H("#74B45C"), Bottom = H("#5E9E4A"), Edge = light };
+            yield return new ButtonStyleDef { Name = "gold", Top = H("#F6D472"), Bottom = H("#E2B23C"), Edge = light };
+            yield return new ButtonStyleDef { Name = "red", Top = H("#E77A64"), Bottom = H("#D9604C"), Edge = light };
+            yield return new ButtonStyleDef { Name = "paper", Top = H("#FFFFFF"), Bottom = H("#F3EAD6"), Edge = H("#E6DAC0") };
+            yield return new ButtonStyleDef { Name = "disabled", Top = H("#E8E0CE"), Bottom = H("#DDD3BC"), Edge = H("#D0C5AB") };
+            yield return new ButtonStyleDef { Name = "dark", Top = H("#4A3B31"), Bottom = H("#3A2E26"), Edge = new Color(1, 1, 1, 0.14f) };
         }
 
         private static Texture2D ButtonFace(ButtonStyleDef s)
         {
-            var c = new PaintCanvas(384, 192, 2);
-            var outer = Sd.Box(192, 96, 190, 94, 60);
-            c.Fill(outer, Sh.Solid(s.Outline));
-            var body = Sd.Box(192, 96, 183, 87, 54);
-            c.Fill(body, Sh.Lit(184, 8, s.Light, s.Deep, new Color(1, 1, 1, 0.55f), Pal.A(Color.black, 0.28f), 9));
-            var gloss = Sd.Inter(Sd.Box(192, 130, 160, 46, 40), Sd.HalfAbove(104));
-            c.Fill(gloss, Sh.V(176, 104, new Color(1, 1, 1, 0.42f), new Color(1, 1, 1, 0.04f)));
-            c.Fill(Sd.Inter(Sd.Edge(Sd.Box(192, 96, 176, 80, 48), 2), Sd.HalfAbove(96)), Sh.Solid(new Color(1, 1, 1, 0.3f)));
-            return c.ToTexture();
-        }
-
-        private static Texture2D ButtonDepth(ButtonStyleDef s)
-        {
-            var c = new PaintCanvas(384, 192, 2);
-            var outer = Sd.Box(192, 96, 190, 94, 60);
-            c.Fill(outer, Sh.V(188, 4, Color.Lerp(s.Outline, s.Deep, 0.35f), s.Outline));
+            var c = new PaintCanvas(256, 128, 2);
+            var shape = Sd.Box(128, 64, 127, 63, 63);
+            c.Fill(shape, Sh.V(128, 0, s.Top, s.Bottom));
+            c.Fill(Sd.Edge(Sd.Inflate(shape, -1f), 2f), Sh.Solid(s.Edge));
             return c.ToTexture();
         }
     }

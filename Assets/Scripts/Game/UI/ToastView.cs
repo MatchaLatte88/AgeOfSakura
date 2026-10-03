@@ -5,14 +5,16 @@ using UnityEngine.UI;
 namespace AgeOfSakura.Game
 {
     /// <summary>
-    /// Short, non-blocking message ("Not enough Wood") on a lacquer pill with an alert icon. Slides down from the top edge with a
-    /// soft overshoot, waits, then fades. Never opens a store or a modal.
+    /// Short, non-blocking message ("Not enough Wood") on a dark glass pill with an alert icon. Slides down a little from under the
+    /// resource bar, waits, then fades. Never opens a store or a modal.
     /// </summary>
     public sealed class ToastView : MonoBehaviour
     {
-        private const float RestY = -150f;
-        private const float SlideSeconds = 0.42f;
-        private const float FadeSeconds = 0.45f;
+        private const float Height = 76f;
+        private const float RestY = -24f - UiTheme.BarHeight - 20f;
+        private const float SlideDistance = 36f;
+        private const float SlideSeconds = 0.3f;
+        private const float FadeSeconds = 0.4f;
 
         private UiKit kit;
         private RectTransform rect;
@@ -23,7 +25,7 @@ namespace AgeOfSakura.Game
 
         public static ToastView Create(UiKit kit, RectTransform parent)
         {
-            var panel = kit.Sliced(parent, "Toast", "pill_lacquer", false);
+            var panel = kit.Glass(parent, "Toast", "pill_dark", Height * 0.5f, false);
             var view = panel.gameObject.AddComponent<ToastView>();
             view.Build(kit, panel);
             return view;
@@ -36,18 +38,18 @@ namespace AgeOfSakura.Game
             group = gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
             group.blocksRaycasts = false;
-            UiKit.AddShadow(gameObject, -8f, 0.34f);
+            UiKit.AddShadow(gameObject, -6f, 0.3f);
 
-            UiKit.Place(rect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, RestY), new Vector2(200f, 108f));
-            UiKit.AddGroup(gameObject, false, 18f, TextAnchor.MiddleCenter, 26, 8, 46, 10);
+            UiKit.Place(rect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, RestY), new Vector2(200f, Height));
+            UiKit.AddGroup(gameObject, false, 14f, TextAnchor.MiddleCenter, 18, 0, 34, 0);
             var fitter = gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-            UiKit.Size(gameObject, height: 108f);
+            UiKit.Size(gameObject, height: Height);
 
-            kit.Picture(transform, "Icon", "alert", new Vector2(70f, 70f));
-            text = kit.Text(transform, string.Empty, TextStyle.Light, 42, Palette.Cream, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Message");
-            UiKit.Size(text.gameObject, height: 70f);
+            kit.Picture(transform, "Icon", "alert", new Vector2(44f, 44f));
+            text = kit.Text(transform, string.Empty, UiTheme.FontBody, Palette.Cream, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Message");
+            UiKit.Size(text.gameObject, height: Height);
             enabled = false;
         }
 
@@ -59,7 +61,7 @@ namespace AgeOfSakura.Game
             age = 0f;
             lifetime = seconds;
             group.alpha = 1f;
-            rect.anchoredPosition = new Vector2(0f, RestY + 90f);
+            rect.anchoredPosition = new Vector2(0f, RestY + SlideDistance);
             enabled = true;
         }
 
@@ -67,7 +69,7 @@ namespace AgeOfSakura.Game
         {
             age += Time.unscaledDeltaTime;
             float slide = Mathf.Clamp01(age / SlideSeconds);
-            rect.anchoredPosition = new Vector2(0f, Mathf.LerpUnclamped(RestY + 90f, RestY, Ease.OutBack(slide)));
+            rect.anchoredPosition = new Vector2(0f, Mathf.Lerp(RestY + SlideDistance, RestY, Ease.OutCubic(slide)));
             float fade = Mathf.Clamp01((lifetime - age) / FadeSeconds);
             group.alpha = Mathf.Min(fade, Mathf.Clamp01(age * 8f));
             if (age >= lifetime) enabled = false;

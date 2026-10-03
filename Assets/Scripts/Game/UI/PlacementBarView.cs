@@ -6,22 +6,22 @@ using UnityEngine.UI;
 namespace AgeOfSakura.Game
 {
     /// <summary>
-    /// Bar shown while placing or moving a building: a dark lacquer panel (so it stands apart from the paper sheets) with the
-    /// building name, price, a status pill (icon + words, so valid/invalid is never colour-only) and large round-rect
-    /// rotate / cancel / confirm buttons. Confirm stays tappable when invalid so the player is told why.
+    /// Bar shown while placing or moving a building: the same frosted light panel as the sheets, with the building name, price,
+    /// a status line (icon + words, so valid/invalid is never colour-only) and round rotate / cancel / confirm buttons.
+    /// Confirm stays tappable when invalid so the player is told why.
     /// Layout: [ info column (flexible) ][ rotate ][ cancel ][ confirm ].
     /// </summary>
     public sealed class PlacementBarView : MonoBehaviour
     {
-        private const float Height = 262f;
-        private const float MaxWidth = 1680f;
+        private const float MaxWidth = 1500f;
+        private const float RestY = 16f;
+        private const float ButtonSize = 92f;
 
         private PlacementController placement;
         private UiKit kit;
         private TMP_Text title;
         private TMP_Text message;
         private Image statusIcon;
-        private Image statusPill;
         private RectTransform priceRow;
         private UiButton confirm;
         private UiButton rotate;
@@ -32,7 +32,7 @@ namespace AgeOfSakura.Game
 
         public static PlacementBarView Create(UiKit kit, RectTransform parent, PlacementController placement)
         {
-            var panel = kit.Sliced(parent, "PlacementBar", "panel_lacquer", true);
+            var panel = kit.Glass(parent, "PlacementBar", "panel_light", UiTheme.PanelRadius);
             var view = panel.gameObject.AddComponent<PlacementBarView>();
             view.Build(kit, panel, parent, placement);
             return view;
@@ -44,46 +44,45 @@ namespace AgeOfSakura.Game
             placement = placementRef;
             rect = panel.rectTransform;
             parentRect = parent;
-            UiKit.AddShadow(gameObject, 14f, 0.34f);
-            UiKit.Place(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(MaxWidth, Height));
+            UiKit.AddShadow(gameObject, 8f, 0.3f);
+            UiKit.Place(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, RestY), new Vector2(MaxWidth, 0f));
 
-            var row = kit.Row(rect, "Content", 22f, TextAnchor.MiddleLeft, 74, 40, 62, 40);
-            UiKit.Stretch(row);
+            var row = UiKit.AddGroup(gameObject, false, 16f, TextAnchor.MiddleLeft, 34, 18, 22, 18);
+            row.childForceExpandHeight = false;
+            var fitter = gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // ---- info column: title, then price + status on one line
-            var info = kit.Column(row, "Info", 8f, TextAnchor.MiddleLeft);
+            var info = kit.Column(rect, "Info", 6f, TextAnchor.MiddleLeft);
             UiKit.Size(info.gameObject, flexWidth: 1f);
 
-            title = kit.Text(info, string.Empty, TextStyle.Outlined, 58, Palette.Cream, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Title");
-            UiKit.Size(title.gameObject, height: 68f);
+            title = kit.Text(info, string.Empty, UiTheme.FontHeading + 2, Palette.Ink, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Title");
+            UiKit.Size(title.gameObject, height: 54f);
 
             var line = kit.Row(info, "Line", 18f, TextAnchor.MiddleLeft);
-            UiKit.Size(line.gameObject, height: 72f);
+            UiKit.Size(line.gameObject, height: UiTheme.ChipHeight + 4f);
             priceRow = kit.Row(line, "Price", 10f, TextAnchor.MiddleLeft);
-            UiKit.Size(priceRow.gameObject, height: 72f);
+            UiKit.Size(priceRow.gameObject, height: UiTheme.ChipHeight + 4f);
 
-            statusPill = kit.Sliced(line, "Status", "pill_paper", false);
-            UiKit.Size(statusPill.gameObject, height: 68f, flexWidth: 1f);
-            UiKit.AddGroup(statusPill.gameObject, false, 12f, TextAnchor.MiddleLeft, 16, 2, 26, 2);
-            statusIcon = kit.Picture(statusPill.transform, "StatusIcon", "check", new Vector2(46f, 46f));
-            message = kit.Text(statusPill.transform, string.Empty, TextStyle.Ink, 36, Palette.Ink, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Message");
-            UiKit.Size(message.gameObject, height: 60f, flexWidth: 1f);
+            var status = kit.Row(line, "Status", 10f, TextAnchor.MiddleLeft);
+            UiKit.Size(status.gameObject, height: UiTheme.ChipHeight + 4f, flexWidth: 1f);
+            statusIcon = kit.Picture(status, "StatusIcon", "check", new Vector2(34f, 34f));
+            message = kit.Text(status, string.Empty, UiTheme.FontBody - 4, Palette.Ink, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Message");
+            UiKit.Size(message.gameObject, height: UiTheme.ChipHeight + 4f, flexWidth: 1f);
 
             // ---- buttons (icons are centred by the button's own layout)
-            float side = UiTheme.TouchMin + 12f;
-            rotate = kit.Button(row, "Rotate", string.Empty, new Vector2(side, side), UiButtonStyle.Secondary, kit.Icons.Get("rotate"), iconOnly: true);
+            rotate = kit.IconButton(rect, "Rotate", "rotate", ButtonSize, UiButtonStyle.Secondary);
             rotate.OnClick(() => placement.Rotate());
 
-            var cancel = kit.Button(row, "Cancel", string.Empty, new Vector2(side, side), UiButtonStyle.Danger, kit.Icons.Get("cross"), iconOnly: true);
+            var cancel = kit.IconButton(rect, "Cancel", "cross", ButtonSize, UiButtonStyle.Danger);
             cancel.OnClick(() => placement.Cancel());
 
-            confirm = kit.Button(row, "Confirm", string.Empty, new Vector2(side + 100f, side), UiButtonStyle.Primary, kit.Icons.Get("check"), iconOnly: true);
+            confirm = kit.Button(rect, "Confirm", string.Empty, new Vector2(ButtonSize + 72f, ButtonSize), UiButtonStyle.Primary, kit.Icons.Get("check"), iconOnly: true);
             confirm.OnClick(() => placement.Confirm());
             confirmPulse = confirm.GameObject.AddComponent<UiPulse>();
             confirmPulse.Target = confirm.Rect;
-            confirmPulse.Amount = 0.028f;
+            confirmPulse.Amount = 0.02f;
             confirmPulse.Speed = 3.2f;
-            kit.AddShine(confirm, 2.8f);
 
             placement.StateChanged += Refresh;
             gameObject.SetActive(false);
@@ -92,8 +91,8 @@ namespace AgeOfSakura.Game
         private void Update()
         {
             // narrower screens (4:3 tablets): never wider than the safe area
-            float width = Mathf.Min(MaxWidth, parentRect.rect.width - 24f);
-            if (!Mathf.Approximately(rect.sizeDelta.x, width)) rect.sizeDelta = new Vector2(Mathf.Max(900f, width), Height);
+            float width = Mathf.Max(900f, Mathf.Min(MaxWidth, parentRect.rect.width - 2f * UiTheme.Gutter));
+            if (!Mathf.Approximately(rect.sizeDelta.x, width)) rect.sizeDelta = new Vector2(width, rect.sizeDelta.y);
         }
 
         public void Refresh()
@@ -121,15 +120,12 @@ namespace AgeOfSakura.Game
             if (!moving)
             {
                 foreach (var cost in def.BuildCost)
-                {
-                    bool enough = placement.CanAfford;
-                    kit.PriceChip(priceRow, kit.Icons.ForCurrency(cost.Currency), cost.Amount.ToString(), enough ? Palette.Cream : new Color(1f, 0.55f, 0.45f), 72f, 44);
-                }
+                    kit.PriceChip(priceRow, kit.Icons.ForCurrency(cost.Currency), cost.Amount.ToString(), ChipTone.Light, !placement.CanAfford, UiTheme.ChipHeight + 4f);
             }
             else
             {
-                var free = kit.Text(priceRow, Loc.T("move_free"), TextStyle.Light, 36, Palette.Cream, TextAlignmentOptions.MidlineLeft, FontStyles.Normal, "Free");
-                UiKit.Size(free.gameObject, height: 60f);
+                var free = kit.Text(priceRow, Loc.T("move_free"), UiTheme.FontBody - 4, Palette.InkSoft, TextAlignmentOptions.MidlineLeft, FontStyles.Normal, "Free");
+                UiKit.Size(free.gameObject, height: UiTheme.ChipHeight + 4f);
             }
 
             if (placement.Check != PlacementCheck.Ok) SetStatus(false, PlacementController.Describe(placement.Check));
@@ -143,19 +139,19 @@ namespace AgeOfSakura.Game
             if (!wasActive && kit.Motion != null)
             {
                 wasActive = true;
-                float restY = 16f;
+                float hidden = -Mathf.Max(rect.rect.height, 140f) - 30f;
                 kit.Motion.Cancel(rect);
-                kit.Motion.Play(0.46f, Ease.OutBackSoft, t => rect.anchoredPosition = new Vector2(0f, Mathf.LerpUnclamped(-Height - 30f, restY, t)), 0f,
-                    () => rect.anchoredPosition = new Vector2(0f, restY), rect);
+                kit.Motion.Play(0.36f, Ease.OutBackSoft, t => rect.anchoredPosition = new Vector2(0f, Mathf.LerpUnclamped(hidden, RestY, t)), 0f,
+                    () => rect.anchoredPosition = new Vector2(0f, RestY), rect);
             }
         }
 
         private void SetStatus(bool ok, string text)
         {
             message.text = text;
-            message.color = ok ? Palette.Ink : Palette.UiRed;
+            message.color = ok ? Palette.InkSoft : Palette.UiRed;
             statusIcon.sprite = kit.Icons.Get(ok ? "check" : "cross");
-            statusIcon.color = ok ? Palette.UiGreenDark : Palette.UiRed;
+            statusIcon.color = ok ? Palette.UiGreen : Palette.UiRed;
         }
     }
 }

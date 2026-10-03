@@ -12,7 +12,7 @@ Coins -> Rice Paddy  -> Rice -> House (eats rice, pays taxes) -> Coins
 - **Supply chain:** a production can list `inputs`. The goods leave the store when the job *starts* (atomically; a failed start costs nothing). Rice Paddies produce Rice, Houses turn Rice into Coins. Rice has its own HUD counter and the goods visibly fly from the counter to the house.
 - **House upgrades (Lv.1 -> 3):** a house has *wishes* that depend on its needs and surroundings. Level 2 wants: 2 tax runs collected (the supply chain works) and Beauty 2. Level 3 wants: 4 tax runs, Beauty 5, Faith 1 and Noise at most 2. Cost is Wood + Coins. Higher levels pay much more Coins per Rice.
 - **Environment variables** (Beauty, Faith, Noise) are computed live from the map: Gardens add Beauty, Shrines Faith (and a little Beauty), Woodcutters add Noise, cherry trees, bamboo and water add Beauty (`environment.terrain`). Each source counts in full within its radius (centre to centre, in cells). So *where* you build and *what you move* changes what a house can become.
-- **Guidance:** the hint bubble above the Build button names the next useful step (`GoalAdvisor`): build the chain, harvest rice, collect taxes, then whatever the next upgrade still lacks. A house that can be upgraded shows a green arrow bubble.
+- **Guidance:** the hint pill above the Build button names the next useful step (`GoalAdvisor`): build the chain, harvest rice, collect taxes, then whatever the next upgrade still lacks. A house that can be upgraded shows a green arrow bubble.
 - **Upgrade UI:** tap a house, tap *Upgrade to Lv.N*, see every wish with its current value, the cost, and the missing wish's hint. Upgraded houses grow and get lanterns (Lv.2) and banners (Lv.3).
 - **Pacing:** a scripted bot using only public rules reaches Lv.2 after about 12 minutes and Lv.3 after about 28 minutes (`Bot_CanPlayFromFreshSaveToLevelThree_WithoutDebugGrants`).
 
@@ -101,7 +101,7 @@ Review it without a device: `Unity -batchmode -nographics -quit -buildTarget Sta
 
 **Deviation that needs Fred's approval:** the YAML asks for icosahedron detail 9 (2000 triangles per foliage clump, a desktop setting). The game uses subdivision level 2 (320 triangles) near and 1 (80) far, always with smooth normals (`ToonStyle.FoliageSubdivisionsNear/Far`).
 
-**Not covered by the style yet** (open questions in the document): UI style (the UI keeps its parchment look), figures and animals (they now use the toon shader and rounded shapes but were not redesigned), the sprite-bake pipeline, atlas format and budgets.
+**Not covered by the style yet** (open questions in the document): figures and animals (they now use the toon shader and rounded shapes but were not redesigned), the sprite-bake pipeline, atlas format and budgets.
 
 ## Save data
 
@@ -119,11 +119,14 @@ Gear button (top right) in the Editor and Development Builds only (`DebugCommand
 
 ## UI
 
-- **Layout-driven:** every button, card, tile, chip and bar is built from layout groups (`UiKit.Row/Column/Button`), not hand-placed offsets, so icons and text stay centred and inside their container. Labels shrink to fit (down to ~55%) instead of overflowing. Shared sizes live in `UiTheme` (minimum touch target 120 units, button height 150, gaps, font sizes).
-- **Buttons:** one `UiKit.Button` (Primary / Secondary / Premium / Danger; normal, pressed, unaffordable, disabled), drop shadow, press-down scale, one global click hook for audio.
+- **Style: compact frosted glass**, the same family as the VoxelHaven HUD: translucent cream panels and dark-brown glass pills with a light upper edge, flat gradient buttons, cream chips for prices (red when the player is short), thin hairlines, soft two-layer shadows, Nunito type. No gold ornaments, no outlined text, no overhanging badges; the glass surfaces carry legibility, so there is no vignette over the world. The settlement stays visible: the bottom sheet takes its height from its content (about 28-35 % of the screen, the old one was 42 %), the placement bar is about 150 units high.
+- **Layout-driven:** every button, card, tile, chip and bar is built from layout groups (`UiKit.Row/Column/Button`), not hand-placed offsets, so icons and text stay centred and inside their container. Labels shrink to fit (down to ~55%) instead of overflowing. Shared sizes live in `UiTheme` (canvas units at reference height 1080, about 2.7 units per dp: touch target 100, button height 108, bar height 84, chip height 48, gutter 28, font sizes 28-48). Corner radii are set per element (`UiKit.Round`): the 9-sliced glass sprites use their border as the corner radius, so one pill sprite serves every height.
+- **HUD:** one dark glass pill, one slot per good (icon, then amount). Coins, Wood and Diamonds are always there; Iron, Tools, Rice and Fish appear the first time the player owns some (flying rewards only target visible slots). Amounts are exact below 1000, then `1.2k`, `12k`, `1.2M` (rounded down); prices in sheets and chips stay exact.
+- **Buttons:** one `UiKit.Button` (Primary / Secondary / Premium / Danger / Dark; normal, pressed, unaffordable, disabled), drop shadow, spring press scale, one global click hook for audio. Pills are round at any height.
 - **Localisation:** all player-facing text is in `Loc.cs` (English + German, follows the device language). Building/production names use keys like `building.house.name` and fall back to the definition text. A missing key is logged as an error and shown as the key. Debug menu > *Language EN/DE* flips the language at runtime to check translations and text fitting.
-- **Screens:** HUD chips, contextual bottom sheet (build menu, building info, production choice, running timer, collect), placement bar, toast, hint, debug menu, collect effects. Safe-area aware; sheet and bar shrink on narrow (4:3) screens.
-- Uses uGUI with the built-in dynamic font. Switching to TextMeshPro (SDF text, outlines) is the next quality step; it needs the TMP essential resources imported and glyph coverage checked for the target languages.
+- **Screens:** HUD bar, contextual bottom sheet (build menu, building info, production choice, running timer, collect), placement bar, toast, hint, debug menu, collect effects. Safe-area aware; sheet and bar shrink on narrow (4:3) screens.
+- **Typeface:** Nunito (SIL Open Font License, see `Assets/Fonts/NUNITO-LICENSE.txt`): SemiBold for running text, ExtraBold for bold. The two TTFs in `Assets/Fonts` are static instances cut from the variable font (`wght` 600 and 800, Latin subset); "Age of Sakura > Generate UI Art" bakes them into static TextMeshPro SDF atlases in `Assets/Resources/UI/Fonts` (Basic Latin + Latin-1, enough for English and German; nothing is generated at runtime and the TTFs are not part of a build). A new language with other glyphs needs them added to `UiFontAssets.Charset`.
+- Uses uGUI with TextMeshPro.
 
 ## Tests
 
@@ -155,12 +158,12 @@ For Google Play use IL2CPP + ARM64 (*Player Settings > Other Settings*) and conf
 - Town Hall is 3x3. Pinch/pan/zoom, long-press move and the ghost drag all go through one `GestureRecognizer`; a drag that starts near the ghost moves the ghost, otherwise it pans.
 - uGUI with the built-in legacy font. Reference resolution 1920x1080 matched on height; safe area via `SafeAreaFitter`.
 - Audio, IAP and analytics are interfaces with no-op implementations (`IAudioService`, `IPurchaseService`, `IAnalyticsService`).
-- The hint bubble follows `GoalAdvisor` (chain order Woodcutter, Rice Paddy, House is hard-coded there; everything after is derived from the house's next upgrade).
+- The hint pill follows `GoalAdvisor` (chain order Woodcutter, Rice Paddy, House is hard-coded there; everything after is derived from the house's next upgrade).
 - Levels are content of the *definition*, not new definitions: a level-2 house is the same building id with `Level = 2`, so saves, positions and views survive upgrades. The view is rebuilt on upgrade (the model provider gets a higher visual level).
 
 ## Known limitations
 
-- Only partly verified on a device (see top): build menu, building/production/collect sheets and HUD were checked on a phone in English. Not yet checked visually: placement bar, toast, debug menu, German texts, 4:3 / 16:9 aspect ratios. No real textures, models, audio or animation clips; NPC animation is code-driven.
+- The compact glass UI was reviewed through showcase screenshots on Windows (build menu, placement bar valid/invalid, all sheet states, upgrade pages, toast, collect effects, debug menu; English at 1560x720, German at 1280x720 and 960x720). It has not been looked at on a device: real touch targets, scrolling the build menu by finger, GPU text rendering of the Nunito atlases and the soft shadows on Android are unchecked. No real textures, models, audio or animation clips; NPC animation is code-driven.
 - Building/rotation art is not varied per rotation. No construction timers, roads, land purchase (by design). Only houses are upgradable so far; every building model has three looks (visual level 1..3) and houses additionally get lanterns (Lv.2) and banners (Lv.3) from `BuildingView`. The Woodcutter and Town Hall looks for levels 2 and 3 are only reachable through the showcase tool (their definitions have no upgrade path yet).
 - Terrain is flat; hills are backdrop only. Camera bounds are rectangular in world space.
 - Production timers use the device clock.

@@ -95,8 +95,9 @@ namespace AgeOfSakura.Game
             Directory.CreateDirectory(options.OutputDirectory);
             yield return new WaitForSecondsRealtime(1.0f);
             // screenshots must not catch buildings half-way through their construction animation (the "buildin" walkthrough does on purpose)
-            BuildInAnimation.SpeedMultiplier = options.States == "galleryhouse" || options.States.StartsWith("gallery_") || options.States == "dockboat" || options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" || options.States == "house" ? 1000f : 1f;
+            BuildInAnimation.SpeedMultiplier = options.States == "galleryhouse" || options.States.StartsWith("gallery_") || options.States == "dockboat" || options.States == "style" || options.States == "hall" || options.States == "woodcutter" || options.States == "shrine" || options.States == "house" || options.States == "ready" ? 1000f : 1f;
             if (options.States == "game") PrepareGameplayWorld();
+            else if (options.States == "ready") PrepareReadyWorld();
             else if (options.States == "style") PrepareStyleWorld();
             else if (options.States == "hall") PrepareHallWorld();
             else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") PrepareSingleBuildingWorld();
@@ -110,6 +111,7 @@ namespace AgeOfSakura.Game
                 yield return new WaitForSecondsRealtime(0.8f);
                 tag = $"{(options.Language == Language.German ? "de" : "en")}_{res.x}x{res.y}";
                 if (options.States == "game") yield return RunGameplay();
+                else if (options.States == "ready") yield return RunReady();
                 else if (options.States == "style") yield return RunStyle();
                 else if (options.States == "hall") yield return RunHall();
                 else if (options.States == "woodcutter" || options.States == "shrine" || options.States == "house") yield return RunSingleBuilding();
@@ -362,6 +364,50 @@ namespace AgeOfSakura.Game
             houseId = s.Buildings.PlaceFree("house", new GridPos(7, 8), 0).InstanceId;
             foreach (var b in s.Buildings.All) if (b.DefinitionId == s.Definitions.Map.TownHallId) hallId = b.InstanceId;
             s.Wallet.Restore(new Dictionary<CurrencyType, long> { { CurrencyType.Coins, 2000 }, { CurrencyType.Wood, 400 }, { CurrencyType.Diamonds, 18 }, { CurrencyType.Rice, 40 } });
+        }
+
+        // ------------------------------------------------------------------ "upgrade ready" states (-uistates ready)
+
+        /// <summary>
+        /// A house that touches the Town Hall (so it needs no road) with a garden next to it and enough goods: the state in which the
+        /// upgrade tile, the upgrade page and the arrow bubble above the house are all "ready" (green).
+        /// </summary>
+        private void PrepareReadyWorld()
+        {
+            var s = ctx.Session;
+            s.Buildings.PlaceFree("rice_paddy", new GridPos(12, 7), 0);
+            houseId = s.Buildings.PlaceFree("house", new GridPos(12, 10), 0).InstanceId; // the Town Hall covers x 9..11
+            s.Buildings.PlaceFree("garden", new GridPos(14, 10), 0);
+            foreach (var b in s.Buildings.All) if (b.DefinitionId == s.Definitions.Map.TownHallId) hallId = b.InstanceId;
+            s.Wallet.Restore(new Dictionary<CurrencyType, long>
+            {
+                { CurrencyType.Coins, 2000 }, { CurrencyType.Wood, 400 }, { CurrencyType.Diamonds, 18 }, { CurrencyType.Rice, 40 }, { CurrencyType.Tools, 20 }
+            });
+        }
+
+        private IEnumerator RunReady()
+        {
+            var s = ctx.Session;
+            ctx.Ui.CloseAllPanels();
+            RunCycle(houseId);
+            RunCycle(houseId);
+            yield return Shot("r01_world_bubble", 0.6f);
+
+            ctx.Selection.Select(houseId);
+            yield return Shot("r02_ready_tile");
+            ctx.Ui.OpenUpgradePage();
+            yield return Shot("r03_ready_page");
+            ctx.Ui.CloseAllPanels();
+
+            var status = s.Housing.TryUpgrade(houseId);
+            log.Add($"upgrade to 2: {status}");
+            // a woodcutter next to the house makes noise, which the next upgrade wants gone
+            s.Buildings.PlaceFree("woodcutter", new GridPos(14, 12), 0);
+            for (int i = 0; i < 4; i++) RunCycle(houseId);
+            ctx.Selection.Select(houseId);
+            ctx.Ui.OpenUpgradePage();
+            yield return Shot("r04_level3_page");
+            ctx.Ui.CloseAllPanels();
         }
 
         private void RunCycle(string id)

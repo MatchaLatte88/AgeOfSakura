@@ -1,0 +1,12 @@
+Nunito (static SemiBold and ExtraBold instances, Latin subset)
+
+Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The full license text and FAQ are available at https://scripts.sil.org/OFL
+
+The two TTF files in this folder were derived from the variable font Nunito[wght]
+(instances at wght=600 and wght=800, reduced to Basic Latin, Latin-1, Latin Extended-A
+and a few punctuation marks). They are the source for the TextMeshPro font assets in
+Assets/Resources/UI/Fonts (baked by "Age of Sakura > Generate UI Art"); only those
+baked atlases are part of a build.

@@ -13,6 +13,7 @@ namespace AgeOfSakura.Game
     public sealed class UiFx : MonoBehaviour
     {
         private const int TrailLength = 3;
+        private const float PopupHeight = 72f;
 
         private sealed class Flight
         {
@@ -72,11 +73,11 @@ namespace AgeOfSakura.Game
         public void PlayCollect(Vector2 screenPosition, IReadOnlyList<CurrencyAmount> rewards)
         {
             RectTransformUtility.ScreenPointToLocalPointInRectangle(layer, screenPosition, null, out var start);
-            float yOffset = 110f;
+            float yOffset = 90f;
             foreach (var reward in rewards)
             {
                 AddPopup(start + new Vector2(0f, yOffset), reward);
-                yOffset -= 96f;
+                yOffset -= PopupHeight + 10f;
 
                 var target = hud.IconOf(reward.Currency);
                 if (target == null) continue;
@@ -113,9 +114,9 @@ namespace AgeOfSakura.Game
                 var image = go.AddComponent<Image>();
                 image.sprite = kit.Icons.Get("sparkle");
                 image.raycastTarget = false;
-                image.color = i % 3 == 0 ? Palette.Cream : Palette.GoldInlay;
+                image.color = i % 3 == 0 ? Palette.Cream : Palette.UiGold;
                 var rt = UiKit.Rect(go);
-                UiKit.Place(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), origin, new Vector2(64f, 64f));
+                UiKit.Place(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), origin, new Vector2(44f, 44f));
                 float angle = (i / (float)count + Random.Range(-0.04f, 0.04f)) * Mathf.PI * 2f;
                 float speed = Random.Range(170f, 330f);
                 sparks.Add(new Spark
@@ -126,19 +127,22 @@ namespace AgeOfSakura.Game
             }
         }
 
+        /// <summary>"+25" and the resource icon on a small dark glass pill, so it reads over any ground.</summary>
         private void AddPopup(Vector2 position, CurrencyAmount reward)
         {
-            var root = kit.Empty(layer, "Popup");
-            var rt = UiKit.Rect(root);
-            UiKit.Place(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position, new Vector2(340f, 110f));
+            var pill = kit.Glass(layer, "Popup", "pill_dark", PopupHeight * 0.5f, false);
+            var rt = pill.rectTransform;
+            UiKit.Place(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position, new Vector2(0f, PopupHeight));
+            var root = pill.gameObject;
             var group = root.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
             group.interactable = false;
-            UiKit.AddGroup(root, false, 10f, TextAnchor.MiddleCenter);
+            UiKit.AddGroup(root, false, 8f, TextAnchor.MiddleCenter, 26, 0, 18, 0);
+            root.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            var text = kit.Text(root.transform, "+" + reward.Amount, TextStyle.Number, 92, Palette.Cream, TextAlignmentOptions.Midline, FontStyles.Bold, "Amount");
-            UiKit.Size(text.gameObject, height: 104f);
-            kit.Picture(root.transform, "Icon", kit.Icons.ForCurrency(reward.Currency), new Vector2(96f, 96f));
+            var text = kit.Text(root.transform, "+" + reward.Amount, UiTheme.FontNumber + 6, Palette.Cream, TextAlignmentOptions.Midline, FontStyles.Bold, "Amount");
+            UiKit.Size(text.gameObject, height: PopupHeight);
+            kit.Picture(root.transform, "Icon", kit.Icons.ForCurrency(reward.Currency), new Vector2(52f, 52f));
             popups.Add(new Popup { Root = rt, Group = group, Start = position });
         }
 
@@ -156,10 +160,10 @@ namespace AgeOfSakura.Game
             };
             for (int i = 0; i < TrailLength; i++)
             {
-                flight.Trail[i] = MakeFlyImage("Trail", "glow", 70f - i * 12f);
+                flight.Trail[i] = MakeFlyImage("Trail", "glow", 50f - i * 8f);
                 flight.Trail[i].color = new Color(1f, 0.86f, 0.45f, 0f);
             }
-            flight.Main = MakeFlyImage("Fly", null, 78f);
+            flight.Main = MakeFlyImage("Fly", null, 58f);
             flight.Main.sprite = kit.Icons.ForCurrency(currency);
             flights.Add(flight);
         }
@@ -212,7 +216,7 @@ namespace AgeOfSakura.Game
                 if (t >= 1f) { Destroy(p.Root.gameObject); popups.RemoveAt(i); continue; }
                 float pop = Ease.OutBack(Mathf.Clamp01(p.Age / 0.28f));
                 p.Root.localScale = Vector3.one * pop;
-                p.Root.anchoredPosition = p.Start + new Vector2(0f, 120f * Ease.OutCubic(t));
+                p.Root.anchoredPosition = p.Start + new Vector2(0f, 90f * Ease.OutCubic(t));
                 p.Group.alpha = t < 0.68f ? 1f : 1f - (t - 0.68f) / 0.32f;
             }
 

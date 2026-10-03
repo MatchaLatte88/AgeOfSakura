@@ -8,35 +8,51 @@ using UnityEngine.UI;
 
 namespace AgeOfSakura.Game
 {
-    /// <summary>Speech-bubble style nudge above the Build button ("Build: Woodcutter"). Bobs gently so it draws the eye.</summary>
+    /// <summary>
+    /// One-line nudge with the next useful step ("Build: Woodcutter") on a light glass pill above the Build button: a green dot,
+    /// then the text. It only fades and slides in; the Build button's pulse is what draws the eye.
+    /// </summary>
     public sealed class HintView : MonoBehaviour
     {
-        private const float RestY = 232f;
+        private const float Height = 68f;
+        private const float RestY = UiTheme.Gutter + UiTheme.ButtonHeight + 16f;
+        private const float SlideDistance = 18f;
+        private const float InSeconds = 0.3f;
+
+        private RectTransform parentRect;
         private RectTransform rect;
+        private CanvasGroup group;
         private TMP_Text text;
+        private LayoutElement textSize;
         private float shownAt;
 
         public static HintView Create(UiKit kit, RectTransform parent)
         {
-            var go = kit.Empty(parent, "Hint");
-            var view = go.AddComponent<HintView>();
-            view.Build(kit, go.GetComponent<RectTransform>());
+            var pill = kit.Glass(parent, "Hint", "pill_light", Height * 0.5f, false);
+            var view = pill.gameObject.AddComponent<HintView>();
+            view.Build(kit, pill.rectTransform, parent);
             return view;
         }
 
-        private void Build(UiKit kit, RectTransform root)
+        private void Build(UiKit kit, RectTransform root, RectTransform parent)
         {
             rect = root;
-            UiKit.Place(rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-34f, RestY), new Vector2(880f, 190f));
+            parentRect = parent;
+            group = gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            UiKit.Place(rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-UiTheme.Gutter, RestY), new Vector2(0f, Height));
+            UiKit.AddShadow(gameObject, -6f, 0.24f);
+            UiKit.AddGroup(gameObject, false, 14f, TextAnchor.MiddleCenter, 26, 0, 32, 0);
+            var fitter = gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            var pill = kit.Sliced(rect, "Bubble", "pill_paper", false);
-            UiKit.AddShadow(pill.gameObject, -8f, 0.3f);
-            UiKit.Place(pill.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0f, 46f), new Vector2(880f, 130f));
-            text = kit.Text(pill.transform, string.Empty, TextStyle.Ink, 42, Palette.Ink, TextAlignmentOptions.Center, FontStyles.Bold, "Text", wrap: true);
-            UiKit.Stretch(text.rectTransform, 34f, 8f, 34f, 12f);
+            var dot = kit.Sliced(root, "Dot", "pill_flat", false);
+            dot.color = Palette.UiGreen;
+            UiKit.Round(dot, 9f);
+            UiKit.Size(dot.gameObject, 18f, 18f);
 
-            var tail = kit.Picture(rect, "Tail", "tail_paper", new Vector2(64f, 48f));
-            UiKit.Place(tail.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-150f, 6f), new Vector2(64f, 48f));
+            text = kit.Text(root, string.Empty, UiTheme.FontBody - 2, Palette.Ink, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Text");
+            textSize = UiKit.Size(text.gameObject, height: Height);
             gameObject.SetActive(false);
         }
 
@@ -44,17 +60,22 @@ namespace AgeOfSakura.Game
         {
             if (!gameObject.activeSelf) shownAt = Time.unscaledTime;
             text.text = message;
+            // the pill hugs the text, but never grows wider than the screen allows (long German goals shrink instead)
+            // (the first call comes from the UI's constructor, before the canvas has been laid out: then the screen's aspect ratio stands in)
+            float available = parentRect.rect.width > 1f ? parentRect.rect.width : 1080f * Screen.width / Mathf.Max(1, Screen.height);
+            float limit = Mathf.Max(300f, available - 2f * UiTheme.Gutter - 90f);
+            textSize.preferredWidth = Mathf.Min(text.GetPreferredValues(message).x, limit);
             gameObject.SetActive(true);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
         }
 
         public void Hide() => gameObject.SetActive(false);
 
         private void Update()
         {
-            float t = Time.unscaledTime - shownAt;
-            float pop = Ease.OutBack(Mathf.Clamp01(t / 0.4f));
-            rect.localScale = Vector3.one * pop;
-            rect.anchoredPosition = new Vector2(-34f, RestY + Mathf.Sin(Time.unscaledTime * 3.2f) * 8f);
+            float t = Ease.OutCubic(Mathf.Clamp01((Time.unscaledTime - shownAt) / InSeconds));
+            group.alpha = t;
+            rect.anchoredPosition = new Vector2(-UiTheme.Gutter, RestY - SlideDistance * (1f - t));
         }
     }
 
@@ -118,8 +139,6 @@ namespace AgeOfSakura.Game
             var canvasRect = canvasGo.GetComponent<RectTransform>();
             kit.Motion = canvasGo.AddComponent<UiMotion>();
 
-            BuildScreenDecoration(canvasRect);
-
             var safe = kit.Empty(canvasGo.transform, "SafeArea");
             var safeRect = UiKit.Rect(safe);
             UiKit.Stretch(safeRect);
@@ -129,12 +148,12 @@ namespace AgeOfSakura.Game
             Toast = ToastView.Create(kit, safeRect);
             hint = HintView.Create(kit, safeRect);
 
-            buildButton = kit.Button(safeRect, "BuildButton", Loc.T("build"), new Vector2(372f, 178f), UiButtonStyle.Primary, kit.Icons.Get("hammer"), 64);
-            UiKit.Place(buildButton.Rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-34f, 30f), new Vector2(372f, 178f));
-            kit.AddShine(buildButton, 4.2f);
+            var buildSize = new Vector2(300f, UiTheme.ButtonHeight);
+            buildButton = kit.Button(safeRect, "BuildButton", Loc.T("build"), buildSize, UiButtonStyle.Primary, kit.Icons.Get("hammer"), UiTheme.FontHeading);
+            UiKit.Place(buildButton.Rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-UiTheme.Gutter, UiTheme.Gutter), buildSize);
             buildPulse = buildButton.GameObject.AddComponent<UiPulse>();
             buildPulse.Target = buildButton.Rect;
-            buildPulse.Amount = 0.022f;
+            buildPulse.Amount = 0.02f;
             buildPulse.Speed = 3f;
             buildPulse.enabled = false;
             buildButton.OnClick(OpenBuildMenu);
@@ -150,25 +169,6 @@ namespace AgeOfSakura.Game
 
             Subscribe();
             ApplyMode();
-        }
-
-        /// <summary>Soft dark edges (vignette, top and bottom fades) so UI stays legible over bright ground and frames the scene.</summary>
-        private void BuildScreenDecoration(RectTransform canvasRect)
-        {
-            var vignette = kit.Empty(canvasRect, "Vignette").AddComponent<Image>();
-            vignette.sprite = kit.Icons.Get("vignette");
-            vignette.raycastTarget = false;
-            UiKit.Stretch(vignette.rectTransform);
-
-            var top = kit.Empty(canvasRect, "FadeTop").AddComponent<Image>();
-            top.sprite = kit.Icons.Get("fade_top");
-            top.raycastTarget = false;
-            UiKit.Place(top.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 300f));
-
-            var bottom = kit.Empty(canvasRect, "FadeBottom").AddComponent<Image>();
-            bottom.sprite = kit.Icons.Get("fade_bottom");
-            bottom.raycastTarget = false;
-            UiKit.Place(bottom.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(0f, 380f));
         }
 
         private static void EnsureEventSystem(Transform parent)

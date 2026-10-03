@@ -7,8 +7,8 @@ namespace AgeOfSakura.EditorTools.UiArt
 {
     /// <summary>
     /// Bakes all UI sprites from <see cref="UiArtRecipes"/> into real PNG assets under Assets/Resources/UI, with the right
-    /// import settings (sprite, 2x pixels-per-unit, 9-slice borders). Artists can replace any PNG later without touching code:
-    /// the game loads sprites by file name. Also writes a contact sheet for quick visual review.
+    /// import settings (sprite, 2x pixels-per-unit, 9-slice borders) and bakes the Nunito TextMeshPro font assets. Artists can replace
+    /// any PNG later without touching code: the game loads sprites by file name. Also writes a contact sheet for quick visual review.
     /// Command line: Unity -batchmode -nographics -quit -projectPath . -executeMethod AgeOfSakura.EditorTools.UiArt.UiArtGenerator.GenerateAll
     /// </summary>
     public static class UiArtGenerator
@@ -41,7 +41,7 @@ namespace AgeOfSakura.EditorTools.UiArt
             AssetDatabase.Refresh();
 
             foreach (var entry in entries) ConfigureImporter(entry);
-            UiFontMaterials.Generate();
+            UiFontAssets.Generate();
             AssetDatabase.SaveAssets();
 
             WriteContactSheet(sheet);

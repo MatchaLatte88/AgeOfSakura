@@ -15,11 +15,9 @@ namespace AgeOfSakura.Game
         private static readonly string[] Required =
         {
             "coin", "wood", "diamond", "hammer", "check", "cross", "rotate", "gear", "house", "woodcutter", "town_hall", "rice", "tools", "fish", "iron", "mine", "rice_paddy", "garden", "shrine", "blacksmith", "fisher_dock", "road", "beauty", "noise", "faith", "upgrade", "lock", "clock",
-            "bubble", "bubble_tail", "badge", "alert", "medallion", "glow", "sparkle", "rays", "shine", "vignette", "fade_top", "fade_bottom",
-            "paper_noise", "panel_paper", "panel_lacquer", "pill_lacquer", "pill_paper", "card_paper", "card_locked", "trough", "bar_green",
-            "bar_gold", "divider", "tail_paper",
-            "btn_green", "btn_green_depth", "btn_gold", "btn_gold_depth", "btn_red", "btn_red_depth", "btn_paper", "btn_paper_depth",
-            "btn_dark", "btn_dark_depth", "btn_disabled", "btn_disabled_depth"
+            "bubble", "alert", "glow", "sparkle",
+            "panel_light", "pill_light", "pill_dark", "pill_flat", "card_light", "card_locked", "trough", "bar_green", "bar_gold",
+            "btn_green", "btn_gold", "btn_red", "btn_paper", "btn_dark", "btn_disabled"
         };
 
         private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();

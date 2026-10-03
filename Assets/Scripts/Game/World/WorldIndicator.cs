@@ -12,7 +12,7 @@ namespace AgeOfSakura.Game
     }
 
     /// <summary>
-    /// Reusable world-space marker above a building: a small progress capsule while producing, a golden bubble with radiating rays
+    /// Reusable world-space marker above a building: a small progress capsule while producing, a cream bubble with a soft glow
     /// and a bouncing resource icon when ready. The camera never rotates, so the sprites are oriented once and need no per-frame
     /// billboarding. Update() is enabled only while the ready bubble animates, so idle buildings cost nothing.
     /// </summary>
@@ -22,7 +22,6 @@ namespace AgeOfSakura.Game
         private const float BarWidth = 1.25f;
         private const float BarHeight = 0.36f;
 
-        private SpriteRenderer rays;
         private SpriteRenderer glow;
         private SpriteRenderer bubble;
         private SpriteRenderer icon;
@@ -51,9 +50,7 @@ namespace AgeOfSakura.Game
             root.SetParent(transform, false);
             visualRoot = root;
 
-            rays = MakeSprite("Rays", root, art.Icons.Get("rays"), 6, 2.3f);
-            rays.color = new Color(1f, 0.92f, 0.55f, 0.55f);
-            glow = MakeSprite("Glow", root, art.Icons.Get("glow"), 7, 1.9f);
+            glow = MakeSprite("Glow", root, art.Icons.Get("glow"), 7, 1.7f);
             glow.color = new Color(1f, 0.85f, 0.4f, 0.55f);
             bubble = MakeSprite("Bubble", root, art.Icons.Get("bubble"), 8, BubbleSize);
             icon = MakeSprite("Icon", root, art.Icons.Get("coin"), 9, 0.6f);
@@ -105,7 +102,6 @@ namespace AgeOfSakura.Game
             bool upgrade = mode == IndicatorMode.Upgrade;
             bool producing = mode == IndicatorMode.Producing;
 
-            rays.enabled = ready;
             glow.enabled = ready || upgrade;
             bubble.enabled = ready || upgrade;
             icon.enabled = ready || upgrade || producing;
@@ -118,6 +114,7 @@ namespace AgeOfSakura.Game
             bubble.color = Color.white;
 
             if (resourceIcon != null) icon.sprite = resourceIcon;
+            icon.color = upgrade ? Palette.UiGreen : Color.white; // the upgrade arrow is a flat white glyph: tinted, or it vanishes on the cream bubble
             visualRoot.localPosition = Vector3.zero;
             visualRoot.localScale = Vector3.one;
             if (ready || upgrade)
@@ -153,7 +150,6 @@ namespace AgeOfSakura.Game
             visualRoot.localPosition = new Vector3(0f, bounce, 0f);
             float pulse = 1f + Mathf.Sin(phase * 6.8f) * 0.03f;
             visualRoot.localScale = new Vector3(pulse, pulse, 1f);
-            rays.transform.localRotation = Quaternion.Euler(0f, 0f, phase * 18f);
             var c = glow.color;
             c.a = 0.42f + Mathf.Sin(phase * 3.4f) * 0.14f;
             glow.color = c;

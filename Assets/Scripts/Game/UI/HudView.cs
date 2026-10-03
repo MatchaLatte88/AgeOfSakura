@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using AgeOfSakura.Core;
 using TMPro;
 using UnityEngine;
@@ -7,90 +8,100 @@ using UnityEngine.UI;
 namespace AgeOfSakura.Game
 {
     /// <summary>
-    /// Top resource bar: dark lacquer chips with a gold rim, oversized glossy icons that break out of the chip's left edge,
-    /// chunky outlined numbers that count up smoothly. Updated by <see cref="Wallet.CurrencyChanged"/> events (no polling).
+    /// Top resource bar: one dark glass pill, one slot per currency (icon, then the amount; thin dividers in between). Coins, Wood
+    /// and Diamonds are always there, the other goods appear the first time the player owns some. Amounts count up smoothly, show
+    /// "1.2k" above 999 so seven goods fit in one line, and are updated by <see cref="Wallet.CurrencyChanged"/> events (no polling).
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
-        private sealed class Chip
+        private sealed class Slot
         {
             public CurrencyType Currency;
-            public TMP_Text Text;
             public RectTransform Root;
+            public TMP_Text Text;
             public RectTransform Icon;
-            public Image Glow;
+            public Image Flash;
             public long Target;
             public float Shown;
             public int LastShownInt = int.MinValue;
             public float FlashUntil;
+            public bool Always;
+            public bool Seen;
         }
 
-        private const float ChipWidth = 222f;
-        private const float ChipHeight = 98f;
+        private const float SlotWidth = 172f;
+        private const float IconSize = 52f;
+        private const float FlashAlpha = 0.16f;
 
-        private readonly List<Chip> chips = new List<Chip>(4);
+        // display order; the three that need no discovery come with the first game
+        private static readonly CurrencyType[] Order =
+        {
+            CurrencyType.Coins, CurrencyType.Wood, CurrencyType.Iron, CurrencyType.Tools, CurrencyType.Rice, CurrencyType.Fish, CurrencyType.Diamonds
+        };
+
+        private readonly List<Slot> slots = new List<Slot>(7);
         private UiKit kit;
+        private RectTransform root;
 
         public static HudView Create(UiKit kit, RectTransform parent, Wallet wallet)
         {
-            var go = kit.Empty(parent, "Hud");
-            var hud = go.AddComponent<HudView>();
-            hud.Build(kit, go.GetComponent<RectTransform>(), wallet);
+            var pill = kit.Glass(parent, "Hud", "pill_dark", UiTheme.BarHeight * 0.5f); // blocks input: a tap on the bar must not reach the world
+            var hud = pill.gameObject.AddComponent<HudView>();
+            hud.Build(kit, pill.rectTransform, wallet);
             return hud;
         }
 
-        private void Build(UiKit kitRef, RectTransform root, Wallet wallet)
+        private void Build(UiKit kitRef, RectTransform rect, Wallet wallet)
         {
             kit = kitRef;
-            UiKit.Place(root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -26f), new Vector2(1740f, 110f));
-            var layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 20f;
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            layout.padding = new RectOffset(28, 0, 0, 0); // room for the icons that overhang the chips
+            root = rect;
+            UiKit.Place(root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(UiTheme.Gutter, -24f), new Vector2(0f, UiTheme.BarHeight));
+            UiKit.AddShadow(gameObject, -6f, 0.3f);
+            var layout = UiKit.AddGroup(gameObject, false, 0f, TextAnchor.MiddleLeft, 8, 0, 8, 0);
+            layout.childForceExpandHeight = true;
+            var fitter = gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            foreach (CurrencyType currency in new[] { CurrencyType.Coins, CurrencyType.Wood, CurrencyType.Iron, CurrencyType.Tools, CurrencyType.Rice, CurrencyType.Fish, CurrencyType.Diamonds })
+            for (int i = 0; i < Order.Length; i++)
             {
-                var chip = new Chip { Currency = currency };
-                var pill = kit.Sliced(root, currency + "Chip", "pill_lacquer", true);
-                chip.Root = pill.rectTransform;
-                UiKit.Size(pill.gameObject, ChipWidth, ChipHeight);
-                UiKit.AddShadow(pill.gameObject, -7f, 0.34f);
+                var currency = Order[i];
+                var slot = new Slot { Currency = currency, Always = currency == CurrencyType.Coins || currency == CurrencyType.Wood || currency == CurrencyType.Diamonds };
+                slot.Target = wallet.GetBalance(currency);
+                slot.Shown = slot.Target;
+                slot.Seen = slot.Target > 0;
 
-                var glow = kit.Picture(pill.transform, "Glow", "glow", new Vector2(190f, 190f));
-                glow.color = new Color(1f, 0.86f, 0.45f, 0.30f);
-                glow.GetComponent<LayoutElement>().ignoreLayout = true;
-                UiKit.Place(glow.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(26f, 0f), new Vector2(190f, 190f));
-                chip.Glow = glow;
+                var go = kit.Empty(root, currency + "Slot");
+                slot.Root = UiKit.Rect(go);
+                UiKit.AddGroup(go, false, 8f, TextAnchor.MiddleLeft, 16, 0, 10, 0);
+                UiKit.Size(go, SlotWidth, UiTheme.BarHeight);
 
-                var icon = kit.Picture(pill.transform, "Icon", kit.Icons.ForCurrency(currency), new Vector2(122f, 122f));
-                icon.GetComponent<LayoutElement>().ignoreLayout = true;
-                UiKit.Place(icon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(26f, 4f), new Vector2(122f, 122f));
-                chip.Icon = icon.rectTransform;
+                var flash = kit.Sliced(go.transform, "Flash", "pill_flat", false);
+                UiKit.Round(flash, UiTheme.BarHeight * 0.5f - 7f);
+                flash.color = new Color(1f, 1f, 1f, 0f);
+                flash.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                UiKit.Stretch(flash.rectTransform, 2f, 7f, 2f, 7f);
+                slot.Flash = flash;
 
-                // an occasional twinkle on the icon keeps the bar alive
-                var glint = kit.Picture(icon.transform, "Glint", "sparkle", new Vector2(56f, 56f));
-                glint.GetComponent<LayoutElement>().ignoreLayout = true;
-                UiKit.Place(glint.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(26f, 30f), new Vector2(56f, 56f));
-                var twinkle = pill.gameObject.AddComponent<UiGlint>();
-                twinkle.Target = glint.rectTransform;
-                twinkle.Image = glint;
+                if (i > 0)
+                {
+                    var divider = kit.Empty(go.transform, "Divider").AddComponent<Image>();
+                    divider.color = new Color(1f, 1f, 1f, 0.16f);
+                    divider.raycastTarget = false;
+                    divider.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                    UiKit.Place(divider.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(2f, 38f));
+                }
 
-                chip.Text = kit.Text(pill.transform, "0", TextStyle.Number, 58, Palette.Cream, TextAlignmentOptions.MidlineRight, FontStyles.Bold, "Amount");
-                UiKit.Stretch(chip.Text.rectTransform, 96f, 2f, 34f, 4f);
-                chip.Text.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-                // six chips share the bar: long numbers shrink instead of spilling over the rim
-                chip.Text.enableAutoSizing = true;
-                chip.Text.fontSizeMin = 30f;
-                chip.Text.fontSizeMax = 58f;
+                var icon = kit.Picture(go.transform, "Icon", kit.Icons.ForCurrency(currency), new Vector2(IconSize, IconSize));
+                slot.Icon = icon.rectTransform;
 
-                chip.Target = wallet.GetBalance(currency);
-                chip.Shown = chip.Target;
-                chips.Add(chip);
-                SetText(chip);
+                slot.Text = kit.Text(go.transform, "0", UiTheme.FontNumber, Palette.Cream, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, "Amount");
+                UiKit.Size(slot.Text.gameObject, height: UiTheme.BarHeight, flexWidth: 1f).minWidth = 0f;
+                // seven goods share the bar: long amounts shrink instead of spilling over the rim
+                slot.Text.fontSizeMin = 24f;
+
+                slots.Add(slot);
+                SetText(slot);
+                go.SetActive(slot.Always || slot.Seen);
             }
 
             wallet.CurrencyChanged += OnChanged;
@@ -98,40 +109,51 @@ namespace AgeOfSakura.Game
 
         private void OnChanged(CurrencyChange change)
         {
-            foreach (var chip in chips)
+            foreach (var slot in slots)
             {
-                if (chip.Currency != change.Currency) continue;
-                chip.Target = change.NewValue;
+                if (slot.Currency != change.Currency) continue;
+                slot.Target = change.NewValue;
+                if (change.NewValue > 0 && !slot.Seen)
+                {
+                    slot.Seen = true;
+                    slot.Shown = change.OldValue; // the first goods count up from where they were
+                    if (!slot.Root.gameObject.activeSelf)
+                    {
+                        slot.Root.gameObject.SetActive(true);
+                        LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+                    }
+                }
                 if (change.NewValue < change.OldValue)
                 {
-                    chip.Shown = change.NewValue; // spending shows immediately
-                    SetText(chip);
-                    Pop(chip, 1.12f, 0.28f);
+                    slot.Shown = change.NewValue; // spending shows immediately
+                    SetText(slot);
+                    Pop(slot, 1.12f, 0.28f);
                 }
             }
         }
 
+        /// <summary>The icon of a currency's slot, or null while that slot is not shown yet (nothing to fly to or from).</summary>
         public RectTransform IconOf(CurrencyType currency)
         {
-            foreach (var chip in chips) if (chip.Currency == currency) return chip.Icon;
+            foreach (var slot in slots) if (slot.Currency == currency) return slot.Root.gameObject.activeInHierarchy ? slot.Icon : null;
             return null;
         }
 
-        /// <summary>Called when a flying reward icon lands: the icon bounces and the chip glows.</summary>
+        /// <summary>Called when a flying reward icon lands: the icon bounces and the slot lights up briefly.</summary>
         public void Pulse(CurrencyType currency)
         {
-            foreach (var chip in chips)
+            foreach (var slot in slots)
             {
-                if (chip.Currency != currency) continue;
-                Pop(chip, 1.34f, 0.42f);
-                chip.FlashUntil = Time.unscaledTime + 0.35f;
+                if (slot.Currency != currency) continue;
+                Pop(slot, 1.3f, 0.4f);
+                slot.FlashUntil = Time.unscaledTime + 0.3f;
             }
         }
 
-        private void Pop(Chip chip, float peak, float duration)
+        private void Pop(Slot slot, float peak, float duration)
         {
             if (kit.Motion == null) return;
-            var icon = chip.Icon;
+            var icon = slot.Icon;
             kit.Motion.Cancel(icon);
             kit.Motion.Play(duration, Ease.OutBack, t => icon.localScale = Vector3.one * Mathf.LerpUnclamped(peak, 1f, t), 0f, () => icon.localScale = Vector3.one, icon);
         }
@@ -140,27 +162,36 @@ namespace AgeOfSakura.Game
         {
             float dt = Time.unscaledDeltaTime;
             float now = Time.unscaledTime;
-            foreach (var chip in chips)
+            foreach (var slot in slots)
             {
-                if (!Mathf.Approximately(chip.Shown, chip.Target))
+                if (!Mathf.Approximately(slot.Shown, slot.Target))
                 {
-                    float step = Mathf.Max(1f, Mathf.Abs(chip.Target - chip.Shown) * 5f) * dt;
-                    chip.Shown = Mathf.MoveTowards(chip.Shown, chip.Target, step);
-                    SetText(chip);
+                    float step = Mathf.Max(1f, Mathf.Abs(slot.Target - slot.Shown) * 5f) * dt;
+                    slot.Shown = Mathf.MoveTowards(slot.Shown, slot.Target, step);
+                    SetText(slot);
                 }
-                float glow = now < chip.FlashUntil ? 0.85f : 0.30f;
-                var c = chip.Glow.color;
-                c.a = Mathf.MoveTowards(c.a, glow, dt * 3f);
-                chip.Glow.color = c;
+                var c = slot.Flash.color;
+                c.a = Mathf.MoveTowards(c.a, now < slot.FlashUntil ? FlashAlpha : 0f, dt * 1.2f);
+                slot.Flash.color = c;
             }
         }
 
-        private static void SetText(Chip chip)
+        private static void SetText(Slot slot)
         {
-            int shown = Mathf.RoundToInt(chip.Shown);
-            if (shown == chip.LastShownInt) return;
-            chip.LastShownInt = shown;
-            chip.Text.text = shown.ToString("N0");
+            int shown = Mathf.RoundToInt(slot.Shown);
+            if (shown == slot.LastShownInt) return;
+            slot.LastShownInt = shown;
+            slot.Text.text = FormatAmount(shown);
+        }
+
+        /// <summary>Exact below 1000, then "1.2k" / "12k" / "1.2M" (rounded down, so "1.5k" always means at least 1500).</summary>
+        public static string FormatAmount(long value)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            if (value < 1000) return value.ToString(inv);
+            if (value < 10000) return (value / 100 / 10f).ToString("0.0", inv) + "k";
+            if (value < 1000000) return (value / 1000).ToString(inv) + "k";
+            return (value / 100000 / 10f).ToString("0.0", inv) + "M";
         }
     }
 }
